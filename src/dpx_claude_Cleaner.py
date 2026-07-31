@@ -5,7 +5,7 @@
 # PROJECT: dpx_claude_cleaner (cc-sessions)
 # ================================================================================
 #
-# File: cc-sessions-v3.py
+# File: dpx_claude_Cleaner.py
 # Purpose: Browse, rename, move, and delete Claude Code session .jsonl files
 #          and their sessions-index.json entries. See CLAUDE.md for the full
 #          on-disk schema this tool reads/writes.
@@ -14,9 +14,9 @@
 # ================================================================================
 from __future__ import annotations
 """
-cc-sessions-v3.py
-=================
-Multi-purpose Claude Code session manager.
+dpx_claude_Cleaner.py
+======================
+Multi-purpose Claude Code session manager (formerly cc-sessions).
 
 MODES (first positional arg, default: tui)
   tui         Interactive TUI: list, filter, delete, rename, rehome
@@ -25,7 +25,8 @@ MODES (first positional arg, default: tui)
   help        Print this help
 
 USAGE
-  python3 cc-sessions-v3.py [mode] [--root ~/.claude]
+  python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude]
+  dpx_ccleaner [mode] [--root ~/.claude]     (after scripts/deploy_local.sh)
 
 ENVIRONMENT
   CLAUDE_ROOT   Override path to the .claude directory
@@ -179,6 +180,35 @@ def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
     return jsonl.stem, False
 
 
+def get_project_cwd_from_jsonl(jsonl: Path) -> str | None:
+    """
+    Best-effort read of the real working-directory path Claude Code recorded
+    for this session (a top-level "cwd" field present on most message
+    types). This is exact, unlike decode_encoded()'s hyphen-decoding, which
+    is inherently lossy for any real path containing hyphens. Only scans the
+    first handful of lines -- cwd is set from the first message onward, no
+    need to read the whole file.
+    """
+    try:
+        with jsonl.open("r", encoding="utf-8", errors="replace") as fh:
+            for i, raw in enumerate(fh):
+                if i > 20:
+                    break
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    obj = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                cwd = obj.get("cwd")
+                if isinstance(cwd, str) and cwd.strip():
+                    return cwd.strip()
+    except (OSError, PermissionError):
+        pass
+    return None
+
+
 def count_messages(jsonl: Path) -> int:
     """Count user+assistant lines in a .jsonl."""
     n = 0
@@ -218,7 +248,18 @@ def collect_all_sessions(claude_root: Path) -> list[dict]:
     for project_dir in sorted(projects_root.iterdir()):
         if not project_dir.is_dir():
             continue
-        project_label = decode_encoded(project_dir.name)
+        project_label = decode_encoded(project_dir.name)  # lossy fallback
+
+        # Prefer the real cwd recorded inside a session file in this
+        # project dir -- exact, unlike the lossy hyphen-decoded folder name
+        # (e.g. "GoogleDrive-i@dubpixel.tv" decodes to garbage otherwise).
+        for candidate in project_dir.glob("*.jsonl"):
+            if candidate.name.startswith("agent-") or "warmup" in candidate.name:
+                continue
+            real_cwd = get_project_cwd_from_jsonl(candidate)
+            if real_cwd:
+                project_label = real_cwd
+                break
 
         # -- Load index entries for this project --
         index_path = project_dir / INDEX_FILE
@@ -623,7 +664,7 @@ def fmt_ct(n) -> str:
 
 def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_only, help_vis):
     w.erase()
-    title = " cc-sessions "
+    title = " dpx_claude_cleaner "
     w.addstr(0, 0, title, curses.A_BOLD | curses.A_REVERSE)
     info = f" {shown}/{total} sessions"
     if marked:
@@ -844,7 +885,7 @@ def confirm_delete_tui(stdscr, items: list[dict]) -> bool:
         lines.append(f"    {marker}{s['title'][:58]}")
     if len(items) > 14:
         lines.append(f"    ... and {len(items) - 14} more")
-    lines += ["", "  Type YES to confirm, anything else cancels: "]
+    lines.append("")
 
     stdscr.clear()
     for i, line in enumerate(lines):
@@ -853,15 +894,15 @@ def confirm_delete_tui(stdscr, items: list[dict]) -> bool:
         except curses.error:
             pass
     stdscr.refresh()
-    curses.echo()
-    curses.curs_set(1)
-    try:
-        ans = stdscr.getstr(len(lines) - 1, len(lines[-1]), 10)
-    except Exception:
-        ans = b""
-    curses.noecho()
-    curses.curs_set(0)
-    return ans.strip() == b"YES"
+
+    # Reuse readline_inline (already used for rename/filter input) instead of
+    # a raw stdscr.getstr() call at a hand-computed (y, x): the manual
+    # coordinate math there could raise curses.error on narrow terminals,
+    # which was silently swallowed and read back as "cancelled" every time.
+    prompt_row = min(len(lines), height - 1)
+    input_win = stdscr.subwin(1, width, prompt_row, 0)
+    ans = readline_inline(input_win, width, "Type YES to confirm, anything else cancels: ")
+    return ans.strip() == "YES"
 
 
 # ---------------------------------------------------------------------------
@@ -1071,7 +1112,7 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        prog="cc-sessions-v3.py",
+        prog="dpx_claude_Cleaner.py",
         description="Claude Code session manager",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

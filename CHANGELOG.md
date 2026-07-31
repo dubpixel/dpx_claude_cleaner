@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-07-31
+
+### Changed
+- Renamed the working script from `src/cc-sessions-v3.py` to
+  `src/dpx_claude_Cleaner.py` (also retiring the old `-v1`/`-v2` iterations
+  to `src/archive/`). Updated every internal reference (`argparse` prog
+  name, TUI title, docstring, file header) and all docs/scripts that pointed
+  at the old filename.
+
+### Fixed
+- Project labels (in `analyze` output and the TUI) now read the real `cwd`
+  Claude Code records inside each session file, instead of decoding it from
+  the hyphen-encoded project directory name. That decode was lossy for any
+  real path containing a hyphen (e.g. `GoogleDrive-i@dubpixel.tv` used to
+  render as `GoogleDrive/i/dubpixel/tv`). ([#1](https://github.com/dubpixel/dpx_claude_cleaner/issues/1))
+- Delete confirmation (`d` in the TUI) no longer silently reads back as
+  "cancelled": it used a hand-computed `stdscr.getstr(y, x, ...)` call whose
+  `x` coordinate could throw `curses.error` on narrower terminals, which was
+  swallowed and treated as an empty (non-"YES") answer. Now reuses the same
+  `readline_inline` input helper already used for rename/filter.
+  ([#1](https://github.com/dubpixel/dpx_claude_cleaner/issues/1))
+
+---
+
 ## [0.1.1] - 2026-07-31
 
 ### Fixed

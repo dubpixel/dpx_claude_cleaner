@@ -80,7 +80,7 @@ Claude Code stores every conversation as a `.jsonl` file under
 `~/.claude/projects/<encoded-project-path>/`, and those pile up fast — dead
 sessions from abandoned projects, empty sessions from accidental launches,
 orphaned index entries pointing at files that no longer exist. `dpx_claude_cleaner`
-(aka `cc-sessions`) is a single-file, dependency-free Python TUI for cleaning
+(formerly `cc-sessions`) is a single-file, dependency-free Python TUI for cleaning
 that up: browse every session across every project, filter by empty/orphan
 status, rename, move sessions between projects, or delete them — all without
 touching Claude Code's own files except where explicitly documented as safe.
@@ -130,8 +130,10 @@ See `CLAUDE.md` for the full on-disk schema this tool reads and writes.
      ```bash
      git clone https://github.com/dubpixel/dpx_claude_cleaner.git
      cd dpx_claude_cleaner
-     python3 src/cc-sessions-v3.py --version
+     python3 src/dpx_claude_Cleaner.py --version
      ```
+  2. Optional: run `scripts/deploy_local.sh` to copy it to `~/scr` and add a
+     `dpx_ccleaner` shell alias, so it's runnable from anywhere.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -140,16 +142,17 @@ See `CLAUDE.md` for the full on-disk schema this tool reads and writes.
 
 ```bash
 # Interactive TUI (default)
-python3 src/cc-sessions-v3.py
+python3 src/dpx_claude_Cleaner.py
+# ...or, after scripts/deploy_local.sh: dpx_ccleaner
 
 # Print stats by project and exit
-python3 src/cc-sessions-v3.py analyze
+python3 src/dpx_claude_Cleaner.py analyze
 
 # Interactive CLI to clean orphan index entries / add unindexed sessions
-python3 src/cc-sessions-v3.py fix-orphans
+python3 src/dpx_claude_Cleaner.py fix-orphans
 
 # Point at a non-default ~/.claude directory
-python3 src/cc-sessions-v3.py --root /path/to/.claude
+python3 src/dpx_claude_Cleaner.py --root /path/to/.claude
 ```
 
 Full TUI keybindings and column-flag reference are in `CLAUDE.md`.
