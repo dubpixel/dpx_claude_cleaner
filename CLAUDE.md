@@ -103,24 +103,42 @@ Each entry in the array:
 ### .jsonl session file schema (relevant lines only)
 
 ```jsonl
+{"type":"custom-title","customTitle":"Session title","sessionId":"..."}
 {"type":"summary","summary":"Session title","leafUuid":"<uuid>"}
-{"type":"user","sessionId":"...","timestamp":"...","message":{"role":"user","content":"..."}}
+{"type":"user","sessionId":"...","timestamp":"...","cwd":"/real/path","message":{"role":"user","content":"..."}}
 {"type":"assistant","sessionId":"...","message":{"role":"assistant","content":[...]}}
 {"type":"file-history-snapshot",...}   ← skip these
 ```
 
 Only `user` and `assistant` entries count as messages for the `msgs` column.
-The `summary` line is written by Claude Code (or by this tool's rename op)
-and is what the `/resume` picker shows when the index summary is blank.
+
+Title resolution priority (see `get_session_title_from_jsonl()`): latest
+`type=="custom-title"` (`customTitle` field) → latest `type=="summary"`
+(`.summary` field) → first user message text → UUID stem. Both
+`custom-title` and `summary` lines can appear **more than once** per file
+(the title gets renamed mid-conversation) — always take the *last*
+occurrence, not the first; that's what `/resume` displays. The `custom-title`
+line is written by Claude Code itself (this is the actual field `/resume`
+reads — don't confuse it with `summary`, which this tool also writes on
+rename). Also don't decode the project's display path from the
+hyphen-encoded directory name (`decode_encoded()`) if avoidable — it's lossy
+for any real path containing a hyphen. Prefer the `cwd` field recorded
+inside the session file itself (`get_project_cwd_from_jsonl()`), which is
+exact.
 
 ---
 
 ## Modes
 
 ```
-python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude]
+python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude] [--scope current|all]
 dpx_ccleaner [mode] [--root ~/.claude]     # after scripts/deploy_local.sh
 ```
+
+`--scope` defaults to `current` (only the project matching the shell's
+`cwd`, same as `/resume`) for `analyze`/`fix-orphans`. In `tui` mode it
+starts scoped to the current project too, but is a live toggle instead
+(`g` key) rather than a flag — see Keys below.
 
 | Mode | Description |
 |---|---|
@@ -150,6 +168,7 @@ dpx_ccleaner [mode] [--root ~/.claude]     # after scripts/deploy_local.sh
 | `a` / `A` | Mark all visible / unmark all |
 | `e` | Toggle "empty sessions only" filter |
 | `o` | Toggle "orphan sessions only" filter |
+| `g` | Toggle scope: this project (default, like `/resume`) vs global (all projects) |
 | `/` | Text filter on title or project path |
 | `ESC` | Clear active filter |
 | `r` | Rename current session (updates index + injects summary line in .jsonl) |

@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3] - 2026-07-31
+
+### Added
+- `--scope {current,all}` flag for `analyze`/`fix-orphans` (default
+  `current`, matching `/resume`'s per-project scoping); `tui` mode starts
+  scoped to the current project too, with a new `g` key to toggle to global
+  live instead of a flag.
+- Version is now shown inside the running tool itself (TUI title bar, CLI
+  scan banner), not just via `--version`.
+
+### Fixed
+- Titles now read `type: "custom-title"` lines (`customTitle` field) —
+  the actual field Claude Code's `/resume` picker displays — which this
+  tool never checked at all before. Also fixed both `custom-title` and
+  `summary` lookups to take the *last* occurrence in the file instead of
+  the first, since titles get renamed mid-conversation and the old code
+  would show a stale title. Verified directly against a real `/resume`
+  listing pasted by the user: 7/8 titles now match exactly, in the same
+  order. ([#4](https://github.com/dubpixel/dpx_claude_cleaner/issues/4))
+- `encode_path()` only replaced `/` with `-`, but Claude Code's real
+  encoding replaces *every* non-alphanumeric character (spaces, `.`, `@`,
+  `_`, ...). This silently broke the new `--scope current` / `g` toggle
+  (it could never match the real project directory for any path containing
+  a space or other punctuation) — found while testing the scope feature
+  above. Verified against 30 real project directories' recorded `cwd`
+  values; all now match exactly.
+
+---
+
 ## [0.1.2] - 2026-07-31
 
 ### Changed
