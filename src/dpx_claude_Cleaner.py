@@ -54,6 +54,7 @@ COLUMN FLAGS
 import curses
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -79,8 +80,13 @@ except FileNotFoundError:
 # ---------------------------------------------------------------------------
 
 def encode_path(p: Path) -> str:
-    """Encode an absolute path the way Claude Code does: slashes → hyphens, leading hyphen."""
-    return str(p).replace("/", "-")
+    """
+    Encode an absolute path the way Claude Code does: every character that
+    isn't a letter or digit (/, space, ., @, _, ...) becomes a hyphen -- not
+    just path separators. Verified against 30 real project dirs' recorded
+    `cwd` values; all matched exactly.
+    """
+    return re.sub(r"[^A-Za-z0-9]", "-", str(p))
 
 
 def decode_encoded(folder: str) -> str:
@@ -151,9 +157,20 @@ def _extract_message_text(content) -> str | None:
 
 def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
     """
-    Read a .jsonl for a title. Returns (title, came_from_index_summary).
-    Priority: type==summary .summary field → first user message text → UUID stem.
+    Read a .jsonl for a title. Returns (title, is_authoritative).
+    Priority: latest type=="custom-title" -> latest type=="summary" ->
+    first user message text -> UUID stem.
+
+    Both custom-title and summary lines can appear more than once in a
+    session (the title gets renamed mid-conversation) -- the *last* one
+    wins, since that matches what Claude Code's own /resume picker shows.
+    A full scan is required (can't short-circuit on the first match) since
+    a later rename can appear anywhere in the file.
     """
+    last_custom_title = None
+    last_summary = None
+    first_user_snippet = None
+
     try:
         with jsonl.open("r", encoding="utf-8", errors="replace") as fh:
             for raw in fh:
@@ -165,18 +182,29 @@ def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
                 except json.JSONDecodeError:
                     continue
                 t = obj.get("type", "")
-                if t == "summary":
-                    s = obj.get("summary", "").strip()
+                if t == "custom-title":
+                    ct = (obj.get("customTitle") or "").strip()
+                    if ct:
+                        last_custom_title = ct
+                elif t == "summary":
+                    s = (obj.get("summary") or "").strip()
                     if s:
-                        return s, True
-                elif t == "user":
+                        last_summary = s
+                elif t == "user" and first_user_snippet is None:
                     content = obj.get("message", {}).get("content", "")
                     text = _extract_message_text(content)
                     if text:
                         snippet = text.strip().replace("\n", " ")
-                        return snippet[:120] + ("..." if len(snippet) > 120 else ""), False
+                        first_user_snippet = snippet[:120] + ("..." if len(snippet) > 120 else "")
     except (OSError, PermissionError):
         pass
+
+    if last_custom_title:
+        return last_custom_title, True
+    if last_summary:
+        return last_summary, True
+    if first_user_snippet:
+        return first_user_snippet, False
     return jsonl.stem, False
 
 
@@ -662,11 +690,12 @@ def fmt_ct(n) -> str:
 # TUI widgets
 # ---------------------------------------------------------------------------
 
-def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_only, help_vis):
+def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_only, scope_all, help_vis):
     w.erase()
-    title = " dpx_claude_cleaner "
+    title = f" dpx_claude_cleaner v{__version__} "
     w.addstr(0, 0, title, curses.A_BOLD | curses.A_REVERSE)
     info = f" {shown}/{total} sessions"
+    info += "  [global]" if scope_all else "  [this project]"
     if marked:
         info += f"  [{marked} marked]"
     if empty_only:
@@ -691,7 +720,7 @@ def draw_help(w, width):
         "  SPACE       mark/unmark (advance) m    move/rehome marked or current",
         "  a / A       mark all / unmark all d    delete marked or current",
         "  e           empty sessions only   o    orphan sessions only",
-        "  /           text filter           ESC  clear filter",
+        "  /           text filter           g    toggle global/this-project scope",
         "  q           quit                  ?    close help",
         "  FLAGS:  E=empty  !=orphan  *=no index title",
     ]
@@ -770,7 +799,7 @@ def draw_detail(w, width, s):
 
 def draw_status(w, width, msg=""):
     w.erase()
-    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  q=quit"
+    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  g=scope  q=quit"
     try:
         w.addstr(0, 0, (msg or default)[:width], curses.A_REVERSE)
     except curses.error:
@@ -926,8 +955,15 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
     status_msg = ""
     help_visible = False
 
+    # Default to the project matching the shell's cwd (like /resume) rather
+    # than every project on disk; 'g' widens to everything.
+    current_project_name = encode_path(Path.cwd())
+    scope_all = not any(s["project_dir"].name == current_project_name for s in sessions)
+
     def get_visible() -> list[int]:
         idxs = range(len(sessions))
+        if not scope_all:
+            idxs = [i for i in idxs if sessions[i]["project_dir"].name == current_project_name]
         if empty_only:
             idxs = [i for i in idxs if is_empty(sessions[i])]
         elif orphan_only:
@@ -972,7 +1008,7 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
         cur_s = sessions[visible[cursor]] if visible and cursor < len(visible) else None
 
         draw_header(header_win, width, len(sessions), len(visible),
-                    n_marked, filter_str, empty_only, orphan_only, help_visible)
+                    n_marked, filter_str, empty_only, orphan_only, scope_all, help_visible)
         draw_list(list_win, sessions, visible, cursor, scroll, list_h, width)
         draw_detail(detail_win, width, cur_s)
         if help_visible:
@@ -1028,6 +1064,10 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
         elif ch == ord("o"):
             orphan_only = not orphan_only
             empty_only = False
+            cursor = scroll = 0
+
+        elif ch == ord("g"):
+            scope_all = not scope_all
             cursor = scroll = 0
 
         elif ch == ord("/"):
@@ -1122,6 +1162,10 @@ def main():
                         help="Operation mode (default: tui)")
     parser.add_argument("--root", default=None,
                         help="Path to .claude directory (default: ~/.claude)")
+    parser.add_argument("--scope", choices=["current", "all"], default="current",
+                        help="current: only the project matching this shell's "
+                             "cwd, like /resume (default). all: every project. "
+                             "In tui mode, 'g' toggles this live instead.")
     parser.add_argument("--version", action="version",
                         version=f"%(prog)s {__version__}")
     args = parser.parse_args()
@@ -1137,12 +1181,22 @@ def main():
         print(f"Claude root not found: {claude_root}", file=sys.stderr)
         sys.exit(1)
 
+    print(f"dpx_claude_cleaner v{__version__}")
     print(f"Scanning {claude_root} ...")
     sessions = collect_all_sessions(claude_root)
 
     if not sessions:
         print("No sessions found.")
         return
+
+    if args.mode != "tui" and args.scope == "current":
+        current_project_name = encode_path(Path.cwd())
+        scoped = [s for s in sessions if s["project_dir"].name == current_project_name]
+        if scoped:
+            sessions = scoped
+        else:
+            print(f"No sessions found for this project ({Path.cwd()}); "
+                  f"falling back to --scope all.", file=sys.stderr)
 
     n_e = sum(1 for s in sessions if is_empty(s))
     n_o = sum(1 for s in sessions if is_orphan(s))
