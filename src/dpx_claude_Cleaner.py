@@ -756,7 +756,7 @@ def draw_help(w, width):
         "  a / A       mark all / unmark all d    delete marked or current",
         "  e           empty sessions only   o    orphan sessions only",
         "  /           text filter           g    toggle global/this-project scope",
-        "  D           sort \"delete\"-titled sessions to top (still shown)",
+        "  s           sort \"delete\"-titled sessions to top (still shown)",
         "  q           quit                  ?    close help",
         "  FLAGS:  E=empty  !=orphan  *=no index title",
     ]
@@ -835,7 +835,7 @@ def draw_detail(w, width, s):
 
 def draw_status(w, width, msg=""):
     w.erase()
-    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  g=scope  D=sort-delete  q=quit"
+    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  g=scope  s=sort-delete  q=quit"
     try:
         w.addstr(0, 0, (msg or default)[:width], curses.A_REVERSE)
     except curses.error:
@@ -1201,7 +1201,7 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
             scope_all = not scope_all
             cursor = scroll = 0
 
-        elif ch == ord("D"):
+        elif ch == ord("s"):
             sort_delete_first = not sort_delete_first
             cursor = scroll = 0
 
