@@ -1,4 +1,4 @@
-# cc-sessions
+# dpx_claude_cleaner (formerly cc-sessions)
 
 @AGENTS.md
 
@@ -118,7 +118,8 @@ and is what the `/resume` picker shows when the index summary is blank.
 ## Modes
 
 ```
-python3 cc-sessions-v3.py [mode] [--root ~/.claude]
+python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude]
+dpx_ccleaner [mode] [--root ~/.claude]     # after scripts/deploy_local.sh
 ```
 
 | Mode | Description |
