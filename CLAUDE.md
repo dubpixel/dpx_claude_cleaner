@@ -28,10 +28,11 @@ Full rules live in `AGENTS.md`. The load-bearing ones for day-to-day work here:
   spanning >3 files or >30 min.
 - Keep `CHANGELOG.md` and this file updated as things change; confirm README.md
   wording changes with the user before committing.
-
-Note: this project directory is not itself a git repo (the enclosing home
-directory is) — confirm/set up real repo state before assuming `main` exists
-locally as a branch to work off of.
+- **Deploy from the feature branch to test, before merging:** after a fix/feature
+  is committed (and pushed/PR'd), run `scripts/deploy_local.sh` right away so
+  `dpx_ccleaner` reflects the branch under test — don't wait for the PR to merge
+  first. It copies whatever's currently checked out, so this naturally means
+  re-running it after switching branches or merging, too.
 
 ---
 
