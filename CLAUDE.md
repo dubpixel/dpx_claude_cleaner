@@ -28,10 +28,11 @@ Full rules live in `AGENTS.md`. The load-bearing ones for day-to-day work here:
   spanning >3 files or >30 min.
 - Keep `CHANGELOG.md` and this file updated as things change; confirm README.md
   wording changes with the user before committing.
-
-Note: this project directory is not itself a git repo (the enclosing home
-directory is) — confirm/set up real repo state before assuming `main` exists
-locally as a branch to work off of.
+- **Deploy from the feature branch to test, before merging:** after a fix/feature
+  is committed (and pushed/PR'd), run `scripts/deploy_local.sh` right away so
+  `dpx_ccleaner` reflects the branch under test — don't wait for the PR to merge
+  first. It copies whatever's currently checked out, so this naturally means
+  re-running it after switching branches or merging, too.
 
 ---
 
@@ -169,6 +170,7 @@ starts scoped to the current project too, but is a live toggle instead
 | `e` | Toggle "empty sessions only" filter |
 | `o` | Toggle "orphan sessions only" filter |
 | `g` | Toggle scope: this project (default, like `/resume`) vs global (all projects) |
+| `s` | Sort sessions with "delete" (case-insensitive) in the title to the top -- still shown, unlike `/` filtering |
 | `/` | Text filter on title or project path |
 | `ESC` | Clear active filter |
 | `r` | Rename current session (updates index + injects summary line in .jsonl) |
