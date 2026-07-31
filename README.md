@@ -33,9 +33,9 @@
     <img src="images/logo.png" alt="Logo" height="120">
   </a>
 <h1 align="center">dpx_claude_cleaner</h1>
-<h3 align="center"><i>a broom for Claude Code's session sprawl</i></h3>
+<h3 align="center"><i>claude you're a messy bitch</i></h3>
   <p align="center">
-    claude you're a messy bitch
+    clean up your ghost/lost/orphaned/unwanted sessions all from one location.
     <br />
      »  
      <a href="https://github.com/dubpixel/dpx_claude_cleaner"><strong>Project Here!</strong></a>
