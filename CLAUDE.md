@@ -181,9 +181,15 @@ Delete requires typing `YES` at the confirmation prompt.
 
 ### Move/rehome flow
 
-`m` opens a full-screen project picker. Navigate with `j/k`, confirm with
-`ENTER`. Press `n` to create a new project directory by typing an absolute
-path. The tool will:
+`m` opens a full-screen project picker listing already-known Claude project
+dirs. Navigate with `j/k`, confirm with `ENTER`. Press `n` to open a real
+filesystem browser instead (`browse_filesystem()`) — seeded with shortcuts
+to `~`, `~/Code`, and `~/Circuits` (skipped if they don't exist) — to pick
+any directory on disk, including ones that have never been used with Claude
+Code. In the browser: `j/k` to move the highlighted row, `ENTER` to open a
+directory or jump a shortcut, `[ USE THIS DIRECTORY ]` (always the first
+row) to select the currently-shown directory, backspace to go up, `ESC` to
+cancel. The tool will then:
 
 1. Move the `.jsonl` file to the destination project dir.
 2. Remove the entry from the source `sessions-index.json`.

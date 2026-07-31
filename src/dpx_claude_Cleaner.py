@@ -839,6 +839,93 @@ def readline_inline(w, width, prompt: str, default: str = "") -> str:
     return result
 
 
+def browse_filesystem(stdscr, start: Path, shortcuts: list[tuple[str, Path]]) -> Path | None:
+    """
+    Full-screen real-filesystem directory browser (as opposed to
+    pick_project(), which only lists already-known Claude project dirs).
+    Used to pick a destination directory anywhere on disk when moving
+    sessions to a project that hasn't been used with Claude Code yet.
+
+    Rows shown, in order: "[USE THIS DIRECTORY]" (always first), ".." (if
+    not filesystem root), pinned shortcuts, then subdirectories of the
+    current directory. Returns the chosen real Path, or None on cancel.
+    """
+    current = start.resolve()
+    cursor = 0
+    scroll = 0
+
+    def list_rows(cur: Path):
+        rows = [("select", "[ USE THIS DIRECTORY ]", cur)]
+        if cur.parent != cur:
+            rows.append(("up", "..", cur.parent))
+        for label, path in shortcuts:
+            if path != cur:
+                rows.append(("shortcut", f"-> {label}", path))
+        try:
+            children = sorted(
+                (p for p in cur.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                key=lambda p: p.name.lower(),
+            )
+        except (OSError, PermissionError):
+            children = []
+        for child in children:
+            rows.append(("dir", child.name + "/", child))
+        return rows
+
+    while True:
+        rows = list_rows(current)
+        height, width = stdscr.getmaxyx()
+        stdscr.erase()
+
+        try:
+            stdscr.addstr(0, 0, " Browse for destination directory ".center(width, "─")[:width],
+                          curses.A_REVERSE)
+            stdscr.addstr(1, 0, str(current)[:width], curses.A_BOLD)
+            stdscr.addstr(2, 0, " j/k=navigate  ENTER=open/select  ESC=cancel"[:width], curses.A_DIM)
+        except curses.error:
+            pass
+
+        view_rows = height - 5
+        cursor = max(0, min(cursor, len(rows) - 1))
+        if cursor < scroll:
+            scroll = cursor
+        elif cursor >= scroll + view_rows:
+            scroll = cursor - view_rows + 1
+
+        for row, (kind, label, path) in enumerate(rows[scroll: scroll + view_rows], 4):
+            real_idx = scroll + row - 4
+            attr = curses.A_REVERSE if real_idx == cursor else curses.A_NORMAL
+            if kind == "select":
+                attr |= curses.A_BOLD
+            try:
+                stdscr.addstr(row, 0, f"  {label}"[:width], attr)
+            except curses.error:
+                pass
+
+        stdscr.refresh()
+        ch = stdscr.getch()
+
+        if ch in (ord("q"), 27):
+            return None
+        elif ch in (curses.KEY_UP, ord("k")):
+            cursor = max(0, cursor - 1)
+        elif ch in (curses.KEY_DOWN, ord("j")):
+            cursor = min(len(rows) - 1, cursor + 1)
+        elif ch in (curses.KEY_BACKSPACE, 127, 8):
+            if current.parent != current:
+                current = current.parent
+                cursor = scroll = 0
+        elif ch in (ord("\n"), ord("\r"), curses.KEY_ENTER):
+            if not rows:
+                continue
+            kind, _, path = rows[cursor]
+            if kind == "select":
+                return current
+            else:
+                current = path.resolve()
+                cursor = scroll = 0
+
+
 def pick_project(stdscr, projects: list[Path], prompt: str) -> Path | None:
     """
     Full-screen picker for selecting a destination project directory.
@@ -856,7 +943,7 @@ def pick_project(stdscr, projects: list[Path], prompt: str) -> Path | None:
 
         try:
             stdscr.addstr(0, 0, f" {prompt} ".center(width, "─")[:width], curses.A_REVERSE)
-            stdscr.addstr(1, 0, " j/k=navigate  ENTER=select  ESC=cancel  n=new", curses.A_DIM)
+            stdscr.addstr(1, 0, " j/k=navigate  ENTER=select  ESC=cancel  n=browse filesystem", curses.A_DIM)
         except curses.error:
             pass
 
@@ -887,21 +974,21 @@ def pick_project(stdscr, projects: list[Path], prompt: str) -> Path | None:
         elif ch in (ord("\n"), ord("\r"), curses.KEY_ENTER):
             return items[cursor][1] if items else None
         elif ch == ord("n"):
-            # Create a new project dir based on a path the user types
-            stdscr.addstr(height - 1, 0,
-                          " New project path (absolute): "[:width], curses.A_REVERSE)
-            stdscr.refresh()
-            curses.echo()
-            curses.curs_set(1)
-            try:
-                raw = stdscr.getstr(height - 1, 30, width - 31).decode("utf-8").strip()
-            except Exception:
-                raw = ""
-            curses.noecho()
-            curses.curs_set(0)
-            if raw:
-                encoded = encode_path(Path(raw))
-                new_dir = projects[0].parent / encoded  # sibling of existing project dirs
+            # Browse the real filesystem to pick a destination directory
+            # that hasn't been used with Claude Code yet (no project dir
+            # for it exists), instead of typing an absolute path blind.
+            shortcuts = [("Home", Path.home())]
+            for label, sub in (("Code", "Code"), ("Circuits", "Circuits")):
+                candidate = Path.home() / sub
+                if candidate.exists():
+                    shortcuts.append((label, candidate))
+            stdscr.clear()
+            chosen = browse_filesystem(stdscr, Path.home(), shortcuts)
+            stdscr.clear()
+            if chosen is not None:
+                encoded = encode_path(chosen)
+                new_dir = projects[0].parent / encoded if projects else \
+                          (Path.home() / ".claude" / "projects" / encoded)
                 new_dir.mkdir(parents=True, exist_ok=True)
                 return new_dir
 
