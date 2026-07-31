@@ -6,13 +6,13 @@
 
 
 <!-- /// d   u   b   p   i   x   e   l  ---  f   o   r   k   ////--v0.5.7 -->
-<!--this has additionally been modifed by @dubpixel for hardware use -->
+<!--this has additionally been modified by @dubpixel for hardware use -->
 <!--search dpx_claude_cleaner.. search & replace is COMMAND OPTION F -->
 
 <!--this is the version for software -->
 <!--todo ** add small product image thats not in a details tag -->
 <!--todo ** new software product image? Remove it? -->
-<!--igure out how to get the details tag to properly render in jekyll for gihub pages.-->
+<!--figure out how to get the details tag to properly render in jekyll for GitHub Pages.-->
 
 
 
@@ -33,9 +33,9 @@
     <img src="images/logo.png" alt="Logo" height="120">
   </a>
 <h1 align="center">dpx_claude_cleaner</h1>
-<h3 align="center"><i>claude you're a messy bitch/i></h3>
+<h3 align="center"><i>claude you're a messy bitch</i></h3>
   <p align="center">
-    clean up your ghost/lost/orphaned/unwanted sessions all from one location. 
+    clean up your ghost/lost/orphaned/unwanted sessions all from one location.
     <br />
      »  
      <a href="https://github.com/dubpixel/dpx_claude_cleaner"><strong>Project Here!</strong></a>
@@ -81,15 +81,30 @@ Claude Code stores every conversation as a `.jsonl` file under
 sessions from abandoned projects, empty sessions from accidental launches,
 orphaned index entries pointing at files that no longer exist. `dpx_claude_cleaner`
 (formerly `cc-sessions`) is a single-file, dependency-free Python TUI for cleaning
-that up: browse every session across every project, filter by empty/orphan
-status, rename, move sessions between projects, or delete them — all without
-touching Claude Code's own files except where explicitly documented as safe.
+that up, all without touching Claude Code's own files except where explicitly
+documented as safe.
+
+**What it does:**
+- **Browses** every session across every project (or just the one matching
+  your current shell, like `/resume` — toggle live with `g`)
+- **Resolves real titles and project paths** from the fields Claude Code
+  actually writes into each session file (`custom-title`, `cwd`), not by
+  guessing from a possibly-stale index or a lossy-decoded folder name
+- **Flags** empty sessions, orphaned index entries, and unindexed files at a
+  glance (`E` / `!` / `*` columns)
+- **Filters** by text (`/`), or pins sessions you've tagged "delete" to the
+  top of the list (`s`) without hiding anything else
+- **Renames, moves, and deletes** sessions interactively — moving includes a
+  real filesystem browser (not just a list of folders Claude Code already
+  knows about) seeded with shortcuts to `~`, `~/Code`, and `~/Circuits`
+- Also runs as a **one-shot CLI**: `analyze` for a stats report, `fix-orphans`
+  for non-interactive index cleanup
 
 See `CLAUDE.md` for the full on-disk schema this tool reads and writes.
-</br>
+<br />
 
-*author(s): // www.dubpixel.tv  - i@dubpixel.tv | other authors* 
-</br>
+*author(s): // www.dubpixel.tv  - i@dubpixel.tv | other authors*
+<br />
 <h3>Images</h3>
 
 ### FRONT
@@ -155,7 +170,11 @@ python3 src/dpx_claude_Cleaner.py fix-orphans
 python3 src/dpx_claude_Cleaner.py --root /path/to/.claude
 ```
 
-Full TUI keybindings and column-flag reference are in `CLAUDE.md`.
+In the TUI: `j`/`k` to navigate, `SPACE` to mark, `d` to delete (marked, or
+current), `r` to rename, `m` to move (with a filesystem browser), `g` to
+toggle project-only vs. global scope, `s` to sort "delete"-titled sessions
+to the top, `/` to filter, `?` for the full help pane. Full keybindings and
+column-flag reference are in `CLAUDE.md`.
 
 <!-- REFLECTION -->
 ## Reflection
@@ -222,7 +241,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/github/contributors/dubpixel/dpx_claude_cleaner.svg?style=flat-square
 [contributors-url]: https://github.com/dubpixel/dpx_claude_cleaner/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/gdubpixel/dpx_claude_cleaner.svg?style=flat-square
+[forks-shield]: https://img.shields.io/github/forks/dubpixel/dpx_claude_cleaner.svg?style=flat-square
 [forks-url]: https://github.com/dubpixel/dpx_claude_cleaner/network/members
 [stars-shield]: https://img.shields.io/github/stars/dubpixel/dpx_claude_cleaner.svg?style=flat-square
 [stars-url]: https://github.com/dubpixel/dpx_claude_cleaner/stargazers
