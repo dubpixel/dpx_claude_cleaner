@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-07-31
+
+### Fixed
+- Title fallback (for sessions with no `custom-title`/`summary`) no longer
+  shows raw harness-injected wrapper text as the title. Two patterns
+  detected: `<local-command-caveat>...` (pure framing, now skipped in favor
+  of the next real user message) and `<command-message>/<command-name>/
+  <command-args>` slash-command invocations (now shows just the command
+  name + args, e.g. `/loop: migrate dpx_yolo_reader - test GUI live...`,
+  instead of the raw XML). ([#8](https://github.com/dubpixel/dpx_claude_cleaner/issues/8))
+
+---
+
 ## [0.2.0] - 2026-07-31
 
 ### Added

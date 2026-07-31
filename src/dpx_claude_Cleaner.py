@@ -135,6 +135,36 @@ def write_index(index_path: Path, entries: list[dict]) -> None:
 # Session discovery
 # ---------------------------------------------------------------------------
 
+_COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
+_COMMAND_NAME_RE = re.compile(r"<command-name>(.*?)</command-name>", re.DOTALL)
+
+
+def _clean_synthetic_user_text(text: str) -> str | None:
+    """
+    Some "user" messages are harness-injected wrapper text, not something
+    the human actually typed: <local-command-caveat>...</...> (framing
+    around local-command tool output) or a slash-command invocation
+    (<command-message>/<command-name>/<command-args>). Neither is a useful
+    session title as raw text.
+
+    Returns cleaned text worth using as a title, or None if this message
+    has nothing worth showing -- the caller should keep scanning for the
+    next real message rather than fall back to this one.
+    """
+    stripped = text.lstrip()
+    if stripped.startswith("<local-command-caveat>"):
+        return None
+    if stripped.startswith(("<command-name>", "<command-message>")):
+        m = _COMMAND_ARGS_RE.search(text)
+        args = m.group(1).strip() if m else ""
+        if not args:
+            return None
+        name_m = _COMMAND_NAME_RE.search(text)
+        name = name_m.group(1).strip() if name_m else ""
+        return f"{name}: {args}" if name else args
+    return text
+
+
 def _extract_message_text(content) -> str | None:
     """
     Pull display text out of a message's `content` field, which Claude Code
@@ -193,6 +223,8 @@ def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
                 elif t == "user" and first_user_snippet is None:
                     content = obj.get("message", {}).get("content", "")
                     text = _extract_message_text(content)
+                    if text:
+                        text = _clean_synthetic_user_text(text)
                     if text:
                         snippet = text.strip().replace("\n", " ")
                         first_user_snippet = snippet[:120] + ("..." if len(snippet) > 120 else "")
