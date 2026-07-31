@@ -722,7 +722,8 @@ def fmt_ct(n) -> str:
 # TUI widgets
 # ---------------------------------------------------------------------------
 
-def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_only, scope_all, help_vis):
+def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_only,
+                scope_all, sort_delete_first, help_vis):
     w.erase()
     title = f" dpx_claude_cleaner v{__version__} "
     w.addstr(0, 0, title, curses.A_BOLD | curses.A_REVERSE)
@@ -734,6 +735,8 @@ def draw_header(w, width, total, shown, marked, filter_str, empty_only, orphan_o
         info += "  [empty]"
     if orphan_only:
         info += "  [orphans]"
+    if sort_delete_first:
+        info += "  [delete-sort]"
     if filter_str:
         info += f"  /{filter_str}"
     try:
@@ -753,6 +756,7 @@ def draw_help(w, width):
         "  a / A       mark all / unmark all d    delete marked or current",
         "  e           empty sessions only   o    orphan sessions only",
         "  /           text filter           g    toggle global/this-project scope",
+        "  D           sort \"delete\"-titled sessions to top (still shown)",
         "  q           quit                  ?    close help",
         "  FLAGS:  E=empty  !=orphan  *=no index title",
     ]
@@ -831,7 +835,7 @@ def draw_detail(w, width, s):
 
 def draw_status(w, width, msg=""):
     w.erase()
-    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  g=scope  q=quit"
+    default = " SPC=mark  d=del  r=rename  m=move  /=filter  e=empty  o=orphan  g=scope  D=sort-delete  q=quit"
     try:
         w.addstr(0, 0, (msg or default)[:width], curses.A_REVERSE)
     except curses.error:
@@ -1079,6 +1083,11 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
     current_project_name = encode_path(Path.cwd())
     scope_all = not any(s["project_dir"].name == current_project_name for s in sessions)
 
+    # Pin titles containing "delete" to the top (still sorted by mtime
+    # within each group, since `sessions` is already mtime-desc and Python's
+    # sort is stable) without hiding the rest, unlike the '/' filter.
+    sort_delete_first = False
+
     def get_visible() -> list[int]:
         idxs = range(len(sessions))
         if not scope_all:
@@ -1094,13 +1103,15 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
             idxs = [i for i in idxs
                     if lo in sessions[i]["title"].lower()
                     or lo in sessions[i]["project_label"].lower()]
+        if sort_delete_first:
+            idxs = sorted(idxs, key=lambda i: "delete" not in sessions[i]["title"].lower())
         return list(idxs)
 
     while True:
         height, width = stdscr.getmaxyx()
         header_h = 1
         detail_h = 1
-        help_h = 9 if help_visible else 0
+        help_h = 10 if help_visible else 0
         status_h = 1
         list_h = max(3, height - header_h - detail_h - help_h - status_h)
 
@@ -1127,7 +1138,8 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
         cur_s = sessions[visible[cursor]] if visible and cursor < len(visible) else None
 
         draw_header(header_win, width, len(sessions), len(visible),
-                    n_marked, filter_str, empty_only, orphan_only, scope_all, help_visible)
+                    n_marked, filter_str, empty_only, orphan_only, scope_all,
+                    sort_delete_first, help_visible)
         draw_list(list_win, sessions, visible, cursor, scroll, list_h, width)
         draw_detail(detail_win, width, cur_s)
         if help_visible:
@@ -1187,6 +1199,10 @@ def run_tui(stdscr, sessions: list[dict], claude_root: Path):
 
         elif ch == ord("g"):
             scope_all = not scope_all
+            cursor = scroll = 0
+
+        elif ch == ord("D"):
+            sort_delete_first = not sort_delete_first
             cursor = scroll = 0
 
         elif ch == ord("/"):

@@ -169,6 +169,7 @@ starts scoped to the current project too, but is a live toggle instead
 | `e` | Toggle "empty sessions only" filter |
 | `o` | Toggle "orphan sessions only" filter |
 | `g` | Toggle scope: this project (default, like `/resume`) vs global (all projects) |
+| `D` | Sort sessions with "delete" (case-insensitive) in the title to the top -- still shown, unlike `/` filtering |
 | `/` | Text filter on title or project path |
 | `ESC` | Clear active filter |
 | `r` | Rename current session (updates index + injects summary line in .jsonl) |

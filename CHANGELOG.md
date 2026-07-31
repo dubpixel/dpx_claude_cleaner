@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-07-31
+
+### Added
+- `D` key in the TUI: sorts sessions with "delete" (case-insensitive) in
+  the title to the top of the list, still shown alongside everything else
+  (unlike `/` filtering, which hides non-matches). Matches for a common
+  cleanup workflow: rename sessions you've decided to get rid of to
+  something containing "delete", then use `D` to gather them for bulk
+  deletion. ([#10](https://github.com/dubpixel/dpx_claude_cleaner/issues/10))
+
+---
+
 ## [0.2.2] - 2026-07-31
 
 ### Fixed
