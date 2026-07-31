@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-07-31
+
+### Added
+- Real filesystem browser (`browse_filesystem()`) for the move/rehome flow
+  (`m` then `n` in the TUI), replacing the old raw-text "type an absolute
+  path" prompt. Navigate actual directories with `j`/`k`/`ENTER`, seeded
+  with shortcuts to `~`, `~/Code`, and `~/Circuits`, so you can pick a
+  destination that's never been used with Claude Code before without
+  typing a path blind.
+
+---
+
 ## [0.1.3] - 2026-07-31
 
 ### Added
