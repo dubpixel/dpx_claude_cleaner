@@ -4,112 +4,133 @@ This document provides operational directives for AI coding assistants (GitHub C
 
 ---
 
-## PROJECT: [Project Name]
+## PROJECT: dpx_claude_cleaner
 
-**Instructions for customizing this section:**
-Replace the placeholders below with your project's specific information. Remove subsections that don't apply. This template is intentionally verbose — prune what you don't need.
-
-**Status:** [e.g., v0.1.0 complete (2026-06-05) ✅]  
-**Branch:** [e.g., `feature/core-app-implementation`]  
-**Version File:** [e.g., `VERSION` (currently 0.1.0)]
+**Status:** v0.2.2 complete (2026-07-31) ✅ — v0.3.0 (sort-delete-titled-sessions key) in review
+**Branch:** `main`
+**Version File:** `VERSION` (currently 0.2.2 on `main`; see CHANGELOG.md for what's pending in open PRs)
 
 ### Architecture (2-minute summary)
 
-[One-paragraph overview: what this project does, core tech, how it works]
-
-**Example:** "Browser-based monitoring tool for Phabrix QX waveform monitors. Pure vanilla JS (no frameworks, no build step, no CDN). Connects to QX REST API on port 8080, polls status/logs every 2-5s, stores settings in localStorage. Works offline in airgapped broadcast facilities."
+Single-file Python TUI (`src/dpx_claude_Cleaner.py`, formerly `cc-sessions`) for
+cleaning up Claude Code's own session storage. No dependencies beyond the
+stdlib (`curses`, `argparse`, `json`, `pathlib`). Walks
+`~/.claude/projects/<encoded-path>/*.jsonl`, resolves each session's real
+title/project path directly from fields inside the `.jsonl` itself (not the
+often-stale `sessions-index.json`), and lets you browse, filter, rename,
+move, and delete sessions interactively or via one-shot CLI modes
+(`analyze`, `fix-orphans`).
 
 | Component | Tech/Location | Purpose | Notes |
 |-----------|---------------|---------|-------|
-| [Component 1] | [Tech] / `path/` | [What it does] | [Key details] |
-| [Component 2] | [Tech] / `path/` | [What it does] | [Key details] |
-| [Component 3] | [Tech] / `path/` | [What it does] | [Key details] |
-| [Reference docs] | [Format] / `path/` | [What it is] | **Source of truth for [topic]** |
+| Session manager | Python 3.10+ / `src/dpx_claude_Cleaner.py` | Discovery, title resolution, TUI, CLI modes | See CLAUDE.md for the full `.jsonl`/index schema |
+| Archived versions | `src/archive/cc-sessions-v1.py`, `v2.py` | Earlier iterations, kept for reference | Not maintained |
+| Local deploy | `scripts/deploy_local.sh` | Copies to `~/scr/dpx_ccleaner`, wires a shell alias | Bakes the resolved version in at copy time |
+| Project context | `CLAUDE.md` | **Source of truth** for the on-disk schema, TUI keys, extension points | Read this before touching session discovery/title logic |
 
 ### Agent Rules (for this repo)
 
 **Before ANY code change:**
-1. Work from `[main/master]` branch; create feature branch: `feature/brief-description`
-2. Bump VERSION file per semantic versioning (AGENTS.md §1)
-3. Create git commit for version bump, tag it: `git tag vX.Y.Z`
+1. Work from `main`; create feature branch: `feature/brief-description`, `fix/...`, `docs/...`
+2. Bump `VERSION` per semantic versioning (AGENTS.md §1)
+3. Create git commit for version bump; tag on merge to `main` (`git tag vX.Y.Z`) — see AGENTS.md §1 tagging workflow
 
 **While coding:**
-- [Project-specific rule or constraint]
-- [Technology requirement or restriction]
-- [Testing/validation requirement]
+- Never rewrite a Claude Code `.jsonl` file except the documented-safe rename
+  injection (see CLAUDE.md "Things not to break")
+- Test title/path-resolution changes against real `~/.claude` data, not just
+  synthetic fixtures — several real bugs here only showed up against actual
+  session files (list-shaped `content`, `custom-title` lines, wrapper-tag
+  first messages)
 - Keep changes small, test before committing
 - File header per AGENTS.md §3
 
 **When done:**
-- Update CHANGELOG.md with feature list
+- Update `CHANGELOG.md` with feature list
 - Create PR per AGENTS.md §1 template
-- [Any project-specific verification steps]
+- Run `scripts/deploy_local.sh` from the branch so `dpx_ccleaner` reflects
+  it for live testing before merge (see CLAUDE.md Workflow section)
 
 ### Critical Constraints
 
 **MUST HAVE:**
-- ✅ [Required capability or dependency]
-- ✅ [Required technology or approach]
-- ✅ [Required compatibility or standard]
+- ✅ Python 3.10+ stdlib only — no pip dependencies, ever
+- ✅ Session discovery must fall back gracefully when `sessions-index.json`
+  doesn't exist (it often doesn't, as of Claude Code ~v2.1.30)
+- ✅ Delete/move operations must be reversible-adjacent: confirm before
+  delete (`YES` typed exactly), never silently touch files outside
+  `~/.claude/projects/`
 
 **DO NOT:**
-- ❌ [Forbidden action or technology]
-- ❌ [Assumption that must be avoided]
-- ❌ [Hard-coded value or static configuration]
-- ❌ [Change that requires explicit verification]
+- ❌ Assume `sessions-index.json` is authoritative or even present
+- ❌ Decode a project's real path from its hyphen-encoded directory name
+  when the real `cwd` field inside a session file is available — the
+  decode is lossy (see CLAUDE.md)
+- ❌ Add a pip dependency for something the stdlib already covers
 
 ### Key Decisions
 
-- **[Decision Title]:** [Explanation - why this approach was chosen over alternatives]
-- **[Decision Title]:** [Rationale for architecture/design choice]
-- **[Decision Title]:** [Context for future agents]
-
-**Examples:**
-- **Dual README templates:** Hardware needs schematics/BOMs, software needs API docs - fundamentally different documentation needs
-- **No WebSocket:** QX REST API is HTTP-only. Polling is the only option.
-- **Bootstrap on connect:** Device specs vary by boot mode - auto-detect on initial connection
+- **stdlib-only, single file:** trivially portable (`scp` one file + `VERSION`
+  and it runs), at the cost of a fairly dense one-file codebase as features
+  grow — see README Reflection section.
+- **Filesystem scan as source of truth, index as optimization:** Claude
+  Code's own index isn't reliably updated, so this tool always falls back to
+  scanning `.jsonl` files directly rather than trusting the index alone.
+- **Read real fields (`cwd`, `custom-title`) instead of re-deriving them:**
+  early versions tried to reconstruct project paths and titles from encoded
+  directory names / first messages; both were unreliable. Reading the actual
+  fields Claude Code writes into the session file is exact and was verified
+  against real `/resume` output and real project directories.
 
 ### Gotchas & Landmines
 
-1. **[Issue Title]:** [Description]. [Workaround or solution]. [Where to look for more info]
-2. **[Issue Title]:** [Description]. [Workaround or solution].
-3. **[Issue Title]:** [Description]. [Always check/verify X before doing Y].
-
-**Examples:**
-- **CORS issue:** API calls from `file://` origin fail. Use launch script or Python server, not direct open.
-- **Boot modes matter:** Device can boot in different modes. Different endpoints available per mode. Always auto-detect on connect.
-- **Manual is authority:** If specs seem odd, check `/docs/manual.pdf` Ch.X. Don't guess.
+1. **Index files often don't exist at all:** don't assume any given project
+   dir has a `sessions-index.json` — most won't. All discovery logic must
+   degrade to a pure filesystem scan.
+2. **Titles/content can be a string OR a list of blocks:** `message.content`
+   is sometimes a plain string, sometimes `[{"type": "text", ...}, ...]`
+   interleaved with tool_use/tool_result/image blocks. Always handle both.
+3. **First "user" message often isn't human-authored:** harness-injected
+   wrapper text (`<local-command-caveat>`, `<command-message>/<command-name>/
+   <command-args>`) can appear before the real first message — see
+   `_clean_synthetic_user_text()`.
+4. **`encode_path()` must replace every non-alphanumeric character**, not
+   just `/` — a partial implementation silently broke project-scope matching
+   for any path with a space, `.`, `@`, or `_` in it. Verify against a real
+   project directory's recorded `cwd` if you touch this function.
 
 ### Common Operations
 
-**[Operation 1 - e.g., Create new project]:** `./script.sh` (interactive prompts for X/Y/Z)
+**Run the TUI locally:** `python3 src/dpx_claude_Cleaner.py` (or `dpx_ccleaner`
+after `scripts/deploy_local.sh`)
 
-**[Operation 2 - e.g., Modify behavior]:** Edit `path/to/file.ext` - all logic centralized
+**Modify title/path resolution:** `get_session_title_from_jsonl()` /
+`get_project_cwd_from_jsonl()` in `src/dpx_claude_Cleaner.py` — read
+CLAUDE.md's `.jsonl` schema section first.
 
-**[Operation 3 - e.g., Add components]:** Add to `path/`, update `config.ext` if special handling needed
+**Add a new TUI action:** add a key handler in `run_tui()`; use
+`readline_inline()` for single-line input, `pick_project()`/
+`browse_filesystem()` for destination pickers.
 
-**[Operation 4 - e.g., Template processing]:**
-- [Scenario A]: `input-A.ext` → `output.ext`
-- [Scenario B]: `input-B.ext` → `output.ext`  
-- [Always]: `.git` and `.env` excluded from copy
+**Add a new CLI mode:** add a branch in `main()` and a `cmd_<name>()`
+function; see CLAUDE.md "Adding a new command-line mode".
 
 ### Reference
 
-See `/CONTEXT.md` for:
-- [Extended architecture details]
-- [Module/component specifications]
-- [Data schemas or API contracts]
-
-See `/.github/CONTEXT.md` for:
-- [API endpoint reference]
-- [Configuration specifications]
-- [Testing procedures]
+See `CLAUDE.md` for:
+- Full on-disk schema (`sessions-index.json`, `.jsonl` line types)
+- TUI keybindings and column-flag reference
+- Extension points (new CLI modes, new TUI actions, index I/O)
+- Things that must never break (append-only `.jsonl` files, index atomicity)
 
 ### Development Philosophy
 
-[Optional: High-level principles for this project type]
-
-**Example:** "This is broadcast infrastructure tooling - reliability and simplicity trump features. Prefer vanilla JavaScript over frameworks. Keep dependencies minimal and auditable. Test in airgapped environments. Design for 24/7 unattended operation."
+This is a personal cleanup utility, not production infrastructure — favor
+directness and real-data verification over defensive engineering. Every fix
+so far has been found and confirmed by testing against real `~/.claude`
+data (or a real `/resume` listing pasted by the user), not by guessing at
+the schema. Keep that habit: when touching discovery/title/path logic,
+verify against actual session files before calling it done.
 
 ---
 ## 0. Mid-Session Issue Triage (MANDATORY)

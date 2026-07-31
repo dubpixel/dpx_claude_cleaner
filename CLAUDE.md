@@ -13,13 +13,16 @@ Full rules live in `AGENTS.md`. The load-bearing ones for day-to-day work here:
 
 - **Before any code change:** branch off `main`/default first — never commit directly
   to it. Name branches `feature/...`, `fix/...`, `docs/...`, `refactor/...`.
-- **Before the first code change:** bump the version (semver) and commit that bump
-  standalone, before the feature/fix commit. This project has no version file yet —
-  create one (`VERSION` or `__version__` in the script) the first time this applies.
+- **Before the first code change:** bump `VERSION` (semver) and commit that bump
+  standalone, before the feature/fix commit.
 - **Never ask permission** to create a branch or open a PR — just do it. PR body
   format and title convention (`[Component] Brief description`) are in AGENTS.md §1.
 - **Commit messages:** short, lowercase, plain English (`add mqtt decoder`, not
   `Added MQTT Decoder support`).
+- **Version tags:** tag version bumps on merge to `main` (`git tag vX.Y.Z && git push
+  --tags`), starting from v0.2.2 onward — earlier bumps weren't tagged, not backfilled.
+- **Release notes:** for MAJOR/MINOR bumps, add an entry to `RELEASE_NOTES.md` using
+  `dpx_release_note_template.md`'s structure (patch bumps: `CHANGELOG.md` only).
 - **Mid-session issues:** default is log a GitHub issue and move on, don't fix
   inline — unless the user explicitly says "fix this" / "fix it now".
 - **No drive-by refactors:** don't "improve" working code while doing something else;
@@ -28,10 +31,11 @@ Full rules live in `AGENTS.md`. The load-bearing ones for day-to-day work here:
   spanning >3 files or >30 min.
 - Keep `CHANGELOG.md` and this file updated as things change; confirm README.md
   wording changes with the user before committing.
-
-Note: this project directory is not itself a git repo (the enclosing home
-directory is) — confirm/set up real repo state before assuming `main` exists
-locally as a branch to work off of.
+- **Deploy from the feature branch to test, before merging:** after a fix/feature
+  is committed (and pushed/PR'd), run `scripts/deploy_local.sh` right away so
+  `dpx_ccleaner` reflects the branch under test — don't wait for the PR to merge
+  first. It copies whatever's currently checked out, so this naturally means
+  re-running it after switching branches or merging, too.
 
 ---
 
