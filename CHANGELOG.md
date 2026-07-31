@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2026-07-31
+
+### Fixed
+- Session titles no longer fall back to the raw UUID when a message's
+  `content` is a list of content blocks (`[{"type": "text", "text": "..."}]`)
+  instead of a plain string — about 15% of real-world session files use this
+  shape. ([#1](https://github.com/dubpixel/dpx_claude_cleaner/issues/1))
+
+---
+
 ## [0.1.0] - 2026-07-31
 
 ### Added

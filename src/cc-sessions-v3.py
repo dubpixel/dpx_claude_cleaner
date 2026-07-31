@@ -128,6 +128,26 @@ def write_index(index_path: Path, entries: list[dict]) -> None:
 # Session discovery
 # ---------------------------------------------------------------------------
 
+def _extract_message_text(content) -> str | None:
+    """
+    Pull display text out of a message's `content` field, which Claude Code
+    stores either as a plain string or as a list of content blocks
+    (`[{"type": "text", "text": "..."}, ...]`, possibly interleaved with
+    tool_use/tool_result/image blocks). Returns None if no text is found.
+    """
+    if isinstance(content, str):
+        return content if content.strip() else None
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        text = " ".join(p for p in parts if p.strip())
+        return text if text.strip() else None
+    return None
+
+
 def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
     """
     Read a .jsonl for a title. Returns (title, came_from_index_summary).
@@ -150,8 +170,9 @@ def get_session_title_from_jsonl(jsonl: Path) -> tuple[str, bool]:
                         return s, True
                 elif t == "user":
                     content = obj.get("message", {}).get("content", "")
-                    if isinstance(content, str) and content.strip():
-                        snippet = content.strip().replace("\n", " ")
+                    text = _extract_message_text(content)
+                    if text:
+                        snippet = text.strip().replace("\n", " ")
                         return snippet[:120] + ("..." if len(snippet) > 120 else ""), False
     except (OSError, PermissionError):
         pass
