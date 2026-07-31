@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-07-31
+
+### Fixed
+- `help` mode and `--help` printed the literal string `None` instead of
+  the usage docstring. Root cause: `from __future__ import annotations`
+  sat *before* the module docstring — only comments may precede a
+  docstring for Python to recognize it as `__doc__`; a statement there
+  demotes the string literal to a no-op expression. Moved the `__future__`
+  import below the docstring instead. ([#2](https://github.com/dubpixel/dpx_claude_cleaner/issues/2))
+
+---
+
 ## [0.2.1] - 2026-07-31
 
 ### Fixed

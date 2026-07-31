@@ -12,7 +12,6 @@
 # Dependencies: Python 3.10+ stdlib only (curses, argparse, json, pathlib)
 #
 # ================================================================================
-from __future__ import annotations
 """
 dpx_claude_Cleaner.py
 ======================
@@ -50,6 +49,7 @@ COLUMN FLAGS
   !   orphan (index entry exists but .jsonl file is missing)
   *   summary from index is blank (title fell back to first message or UUID)
 """
+from __future__ import annotations
 
 import curses
 import json
