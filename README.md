@@ -174,8 +174,8 @@ Full TUI keybindings and column-flag reference are in `CLAUDE.md`.
   <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Fix `--help`/`help` mode printing `None` (see open issues)
-- [ ] Scope session discovery so it only picks up genuine Claude session files
+- [x] Fix `--help`/`help` mode printing `None` (shipped in 0.2.2)
+- [ ] Add an automated test harness / regression tests
 - [ ] Make unindexed `msg_count` scanning lazy for large (8+ MB) sessions
 
 See the [open issues](https://github.com/dubpixel/dpx_claude_cleaner/issues) for a full list of proposed features (and known issues).
