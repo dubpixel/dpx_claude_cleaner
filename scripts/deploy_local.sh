@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ================================================================================
-# BASH SCRIPT - Deploy dpx_claude_cleaner to ~/scr and alias it as dpx_ccleaner
+# BASH SCRIPT - Deploy dpx_claude_cleaner to ~/scr and alias it as zazzle
 # ================================================================================
 # PROJECT: dpx_claude_cleaner (formerly cc-sessions)
 # ================================================================================
 #
 # File: scripts/deploy_local.sh
-# Purpose: Copy the current src/dpx_claude_Cleaner.py to ~/scr/dpx_ccleaner,
-#          mark it executable, and wire up a `dpx_ccleaner` shell alias so
+# Purpose: Copy the current src/dpx_claude_Cleaner.py to ~/scr/zazzle,
+#          mark it executable, and wire up a `zazzle` shell alias so
 #          it's runnable from anywhere.
 # Dependencies: bash, zsh (for the alias line)
 #
@@ -17,9 +17,9 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$PROJECT_ROOT/src/dpx_claude_Cleaner.py"
 DEST_DIR="$HOME/scr"
-DEST="$DEST_DIR/dpx_ccleaner"
+DEST="$DEST_DIR/zazzle"
 RC_FILE="$HOME/.zshrc"
-ALIAS_LINE="alias dpx_ccleaner=\"$DEST\""
+ALIAS_LINE="alias zazzle=\"$DEST\""
 
 if [ ! -f "$SRC" ]; then
     echo "error: $SRC not found" >&2
@@ -57,8 +57,8 @@ PYEOF
 
 echo "deployed dpx_claude_cleaner v$VERSION -> $DEST"
 
-if grep -qF "alias dpx_ccleaner=" "$RC_FILE" 2>/dev/null; then
-    echo "alias dpx_ccleaner already present in $RC_FILE (left as-is)"
+if grep -qF "alias zazzle=" "$RC_FILE" 2>/dev/null; then
+    echo "alias zazzle already present in $RC_FILE (left as-is)"
 else
     {
         echo ""
@@ -68,4 +68,4 @@ else
     echo "added alias to $RC_FILE"
 fi
 
-echo "run 'source $RC_FILE' (or open a new shell), then use: dpx_ccleaner"
+echo "run 'source $RC_FILE' (or open a new shell), then use: zazzle"

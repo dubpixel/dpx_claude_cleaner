@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-07-31
+
+### Changed
+- Renamed the `scripts/deploy_local.sh` shell alias from `dpx_ccleaner` to
+  `zazzle`. Updated everywhere it's referenced (README, CLAUDE.md,
+  AGENTS.md, RELEASE_NOTES.md, the script itself, the tool's own usage
+  docstring). Removed the stale `dpx_ccleaner` alias line and binary
+  locally.
+
+---
+
 ## [0.3.0] - 2026-07-31
 
 ### Added

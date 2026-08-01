@@ -11,7 +11,7 @@ Filled in from `dpx_release_note_template.md` for MAJOR/MINOR releases only
 
 ### Upgrade Steps
 * None — pull latest and re-run `scripts/deploy_local.sh` if you're using
-  the `dpx_ccleaner` shell alias.
+  the `zazzle` shell alias.
 
 ### Breaking Changes
 * None.
