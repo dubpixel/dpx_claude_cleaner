@@ -33,7 +33,7 @@ Full rules live in `AGENTS.md`. The load-bearing ones for day-to-day work here:
   wording changes with the user before committing.
 - **Deploy from the feature branch to test, before merging:** after a fix/feature
   is committed (and pushed/PR'd), run `scripts/deploy_local.sh` right away so
-  `dpx_ccleaner` reflects the branch under test — don't wait for the PR to merge
+  `zazzle` reflects the branch under test — don't wait for the PR to merge
   first. It copies whatever's currently checked out, so this naturally means
   re-running it after switching branches or merging, too.
 
@@ -136,7 +136,7 @@ exact.
 
 ```
 python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude] [--scope current|all]
-dpx_ccleaner [mode] [--root ~/.claude]     # after scripts/deploy_local.sh
+zazzle [mode] [--root ~/.claude]     # after scripts/deploy_local.sh
 ```
 
 `--scope` defaults to `current` (only the project matching the shell's

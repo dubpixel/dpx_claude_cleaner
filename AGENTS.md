@@ -25,7 +25,7 @@ move, and delete sessions interactively or via one-shot CLI modes
 |-----------|---------------|---------|-------|
 | Session manager | Python 3.10+ / `src/dpx_claude_Cleaner.py` | Discovery, title resolution, TUI, CLI modes | See CLAUDE.md for the full `.jsonl`/index schema |
 | Archived versions | `src/archive/cc-sessions-v1.py`, `v2.py` | Earlier iterations, kept for reference | Not maintained |
-| Local deploy | `scripts/deploy_local.sh` | Copies to `~/scr/dpx_ccleaner`, wires a shell alias | Bakes the resolved version in at copy time |
+| Local deploy | `scripts/deploy_local.sh` | Copies to `~/scr/zazzle`, wires a shell alias | Bakes the resolved version in at copy time |
 | Project context | `CLAUDE.md` | **Source of truth** for the on-disk schema, TUI keys, extension points | Read this before touching session discovery/title logic |
 
 ### Agent Rules (for this repo)
@@ -48,7 +48,7 @@ move, and delete sessions interactively or via one-shot CLI modes
 **When done:**
 - Update `CHANGELOG.md` with feature list
 - Create PR per AGENTS.md §1 template
-- Run `scripts/deploy_local.sh` from the branch so `dpx_ccleaner` reflects
+- Run `scripts/deploy_local.sh` from the branch so `zazzle` reflects
   it for live testing before merge (see CLAUDE.md Workflow section)
 
 ### Critical Constraints
@@ -101,7 +101,7 @@ move, and delete sessions interactively or via one-shot CLI modes
 
 ### Common Operations
 
-**Run the TUI locally:** `python3 src/dpx_claude_Cleaner.py` (or `dpx_ccleaner`
+**Run the TUI locally:** `python3 src/dpx_claude_Cleaner.py` (or `zazzle`
 after `scripts/deploy_local.sh`)
 
 **Modify title/path resolution:** `get_session_title_from_jsonl()` /

@@ -148,7 +148,7 @@ See `CLAUDE.md` for the full on-disk schema this tool reads and writes.
      python3 src/dpx_claude_Cleaner.py --version
      ```
   2. Optional: run `scripts/deploy_local.sh` to copy it to `~/scr` and add a
-     `dpx_ccleaner` shell alias, so it's runnable from anywhere.
+     `zazzle` shell alias, so it's runnable from anywhere.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -158,7 +158,7 @@ See `CLAUDE.md` for the full on-disk schema this tool reads and writes.
 ```bash
 # Interactive TUI (default)
 python3 src/dpx_claude_Cleaner.py
-# ...or, after scripts/deploy_local.sh: dpx_ccleaner
+# ...or, after scripts/deploy_local.sh: zazzle
 
 # Print stats by project and exit
 python3 src/dpx_claude_Cleaner.py analyze

@@ -25,7 +25,7 @@ MODES (first positional arg, default: tui)
 
 USAGE
   python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude]
-  dpx_ccleaner [mode] [--root ~/.claude]     (after scripts/deploy_local.sh)
+  zazzle [mode] [--root ~/.claude]     (after scripts/deploy_local.sh)
 
 ENVIRONMENT
   CLAUDE_ROOT   Override path to the .claude directory
