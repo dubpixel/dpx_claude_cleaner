@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2026-08-01
+
+### Fixed
+- Title fallback still showed raw `<local-command-stdout>...` wrapper text
+  (e.g. `That session is still running as a background agent...`) for
+  sessions with no `custom-title`/`summary`, same class of bug as
+  `<local-command-caveat>` fixed in 0.2.1 but a different tag that wasn't
+  covered. Now skipped alongside it, falling through to the next real
+  message or, if there genuinely isn't one, the UUID.
+
+---
+
 ## [0.3.1] - 2026-07-31
 
 ### Changed
