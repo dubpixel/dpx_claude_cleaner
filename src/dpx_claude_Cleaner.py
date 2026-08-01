@@ -139,20 +139,27 @@ _COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
 _COMMAND_NAME_RE = re.compile(r"<command-name>(.*?)</command-name>", re.DOTALL)
 
 
+# Wrapper tags that are always pure framing/noise with no title-worthy
+# content of their own -- skip entirely and keep scanning for the next
+# real message. (<command-name>/<command-message> are handled separately
+# below since their <command-args> payload can be worth keeping.)
+_NOISE_WRAPPER_TAGS = ("<local-command-caveat>", "<local-command-stdout>")
+
+
 def _clean_synthetic_user_text(text: str) -> str | None:
     """
     Some "user" messages are harness-injected wrapper text, not something
-    the human actually typed: <local-command-caveat>...</...> (framing
-    around local-command tool output) or a slash-command invocation
-    (<command-message>/<command-name>/<command-args>). Neither is a useful
-    session title as raw text.
+    the human actually typed: <local-command-caveat>/<local-command-stdout>
+    (framing around local-command tool output) or a slash-command
+    invocation (<command-message>/<command-name>/<command-args>). None of
+    that is a useful session title as raw text.
 
     Returns cleaned text worth using as a title, or None if this message
     has nothing worth showing -- the caller should keep scanning for the
     next real message rather than fall back to this one.
     """
     stripped = text.lstrip()
-    if stripped.startswith("<local-command-caveat>"):
+    if stripped.startswith(_NOISE_WRAPPER_TAGS):
         return None
     if stripped.startswith(("<command-name>", "<command-message>")):
         m = _COMMAND_ARGS_RE.search(text)
