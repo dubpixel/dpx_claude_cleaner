@@ -20,6 +20,7 @@
 <!-- *** I'm using markdown "reference style" links for readability. Reference links are enclosed in brackets [ ] instead of parentheses ( ). See the bottom of this document for the declaration of the reference variables for contributors-url, forks-url, etc. This is an optional, concise syntax you may use. https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 <div align="center">
 
+[![Tests][tests-shield]][tests-url]
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -176,6 +177,16 @@ toggle project-only vs. global scope, `s` to sort "delete"-titled sessions
 to the top, `/` to filter, `?` for the full help pane. Full keybindings and
 column-flag reference are in `CLAUDE.md`.
 
+### Running the tests
+
+```bash
+python3 -m unittest discover -v
+```
+
+61 tests, stdlib `unittest` only, no real `~/.claude` data touched — all
+fixtures live in temp directories. Runs automatically on every push and PR
+via `.github/workflows/tests.yml` (Python 3.10 and 3.12).
+
 <!-- REFLECTION -->
 ## Reflection
 
@@ -239,6 +250,8 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[tests-shield]: https://github.com/dubpixel/dpx_claude_cleaner/actions/workflows/tests.yml/badge.svg
+[tests-url]: https://github.com/dubpixel/dpx_claude_cleaner/actions/workflows/tests.yml
 [contributors-shield]: https://img.shields.io/github/contributors/dubpixel/dpx_claude_cleaner.svg?style=flat-square
 [contributors-url]: https://github.com/dubpixel/dpx_claude_cleaner/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/dubpixel/dpx_claude_cleaner.svg?style=flat-square

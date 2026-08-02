@@ -6,9 +6,9 @@ This document provides operational directives for AI coding assistants (GitHub C
 
 ## PROJECT: dpx_claude_cleaner
 
-**Status:** v0.2.2 complete (2026-07-31) ✅ — v0.3.0 (sort-delete-titled-sessions key) in review
+**Status:** v0.4.0 complete (2026-08-02) ✅
 **Branch:** `main`
-**Version File:** `VERSION` (currently 0.2.2 on `main`; see CHANGELOG.md for what's pending in open PRs)
+**Version File:** `VERSION` (currently 0.4.0 on `main`)
 
 ### Architecture (2-minute summary)
 
@@ -26,6 +26,8 @@ move, and delete sessions interactively or via one-shot CLI modes
 | Session manager | Python 3.10+ / `src/dpx_claude_Cleaner.py` | Discovery, title resolution, TUI, CLI modes | See CLAUDE.md for the full `.jsonl`/index schema |
 | Archived versions | `src/archive/cc-sessions-v1.py`, `v2.py` | Earlier iterations, kept for reference | Not maintained |
 | Local deploy | `scripts/deploy_local.sh` | Copies to `~/scr/zazzle`, wires a shell alias | Bakes the resolved version in at copy time |
+| Tests | `tests/` (stdlib `unittest`) | Regression coverage, organized by behavior area | Run: `python3 -m unittest discover -v`; see CLAUDE.md's Testing section |
+| CI | `.github/workflows/tests.yml` | Runs the suite on push/PR, Python 3.10 + 3.12 | `contents: read` only |
 | Project context | `CLAUDE.md` | **Source of truth** for the on-disk schema, TUI keys, extension points | Read this before touching session discovery/title logic |
 
 ### Agent Rules (for this repo)
@@ -38,14 +40,17 @@ move, and delete sessions interactively or via one-shot CLI modes
 **While coding:**
 - Never rewrite a Claude Code `.jsonl` file except the documented-safe rename
   injection (see CLAUDE.md "Things not to break")
-- Test title/path-resolution changes against real `~/.claude` data, not just
-  synthetic fixtures — several real bugs here only showed up against actual
-  session files (list-shaped `content`, `custom-title` lines, wrapper-tag
-  first messages)
+- Test title/path-resolution changes against real `~/.claude` data first —
+  several real bugs here only showed up against actual session files
+  (list-shaped `content`, `custom-title` lines, wrapper-tag first messages)
+  — then add the regression case to `tests/` so it stays fixed. A fix that
+  only exists as a one-off verification script has already caused a repeat
+  bug once (see CLAUDE.md's Testing section).
 - Keep changes small, test before committing
 - File header per AGENTS.md §3
 
 **When done:**
+- Run `python3 -m unittest discover -v` — must pass before opening a PR
 - Update `CHANGELOG.md` with feature list
 - Create PR per AGENTS.md §1 template
 - Run `scripts/deploy_local.sh` from the branch so `zazzle` reflects
