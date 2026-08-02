@@ -251,6 +251,38 @@ variations there, not inline.
 
 ---
 
+## Testing
+
+```bash
+python3 -m unittest discover -v
+```
+
+`tests/` (stdlib `unittest`, no dependencies), organized by behavior area:
+
+| File | Covers |
+|---|---|
+| `test_titles.py` | `get_session_title_from_jsonl()`, `_extract_message_text()`, `_clean_synthetic_user_text()` |
+| `test_paths.py` | `encode_path()`, `decode_encoded()`, `get_project_cwd_from_jsonl()` |
+| `test_discovery.py` | `collect_all_sessions()`, `is_empty()`, `is_orphan()` |
+| `test_operations.py` | `rename_session()`, `delete_sessions()` |
+| `test_cli.py` | `main()`'s `--scope current` filtering |
+
+All fixtures are synthetic, built in temp directories via `tests/helpers.py`
+-- tests never touch real `~/.claude` data (that's for manual verification
+only, see Development Philosophy below). `tests.helpers` loads
+`src/dpx_claude_Cleaner.py` via `importlib` since its mixed-case filename
+isn't a conventional importable module name.
+
+When fixing a bug found against real data, add the regression case here
+too, not just a one-off verification script -- `_clean_synthetic_user_text`
+needed a second, near-identical fix (`<local-command-caveat>` in 0.2.1,
+`<local-command-stdout>` in 0.3.2) partly because its first fix only ever
+existed as a throwaway script, not a committed test. Runs automatically via
+`.github/workflows/tests.yml` on every push/PR (Python 3.10 and 3.12,
+`contents: read` only).
+
+---
+
 ## Things not to break
 
 - **Never rewrite `.jsonl` files** except for the summary line injection in
