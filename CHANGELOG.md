@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-08-02
+
+### Added
+- Deterministic stdlib `unittest` regression harness under `tests/` for core
+  non-TUI session logic: title/cwd resolution, content extraction, path
+  encode/decode behavior, rename/delete operations, session
+  collect/dedup/orphan-unindexed reconciliation, and `--scope current` CLI
+  filtering behavior.
+- GitHub Actions workflow at `.github/workflows/tests.yml` that runs the
+  regression suite on `push` and `pull_request` across Python 3.10 and 3.12
+  with `contents: read` permissions.
+
+---
+
 ## [0.3.3] - 2026-08-02
 
 ### Fixed

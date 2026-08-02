@@ -4,6 +4,43 @@ Filled in from `dpx_release_note_template.md` for MAJOR/MINOR releases only
 (patch releases are tracked in `CHANGELOG.md`).
 
 ---
+## [0.4.0](https://github.com/dubpixel/dpx_claude_cleaner/compare/v0.3.3...v0.4.0) (2026-08-02)
+
+> Adds a deterministic regression harness and CI automation so session logic
+> changes are validated repeatably instead of by one-off manual scripts.
+
+### Upgrade Steps
+* None — pull latest and re-run `scripts/deploy_local.sh` if you're using
+  the `zazzle` shell alias.
+
+### Breaking Changes
+* None.
+
+### New Features
+* Added a stdlib `unittest` regression suite under `tests/` that covers core
+  non-TUI behaviors:
+  * title precedence (`custom-title` → `summary` → first user text → UUID)
+  * text extraction for string/list/tool-only/invalid message payloads
+  * cwd extraction from session `.jsonl` rows
+  * encode/decode behavior (including known lossy decode cases)
+  * `rename_session()` index + summary-line update behavior
+  * `delete_sessions()` success and unlink-failure paths
+  * `collect_all_sessions()` index/file merge + dedup + orphan/unindexed flags
+  * `main()` path for `--scope current`
+* Added a GitHub Actions test workflow (`.github/workflows/tests.yml`) running
+  the suite on `push` and `pull_request` for Python 3.10 and 3.12.
+
+### Bug Fixes
+* None.
+
+### Performance Improvements
+* None.
+
+### Other Changes
+* Workflow token permissions for tests are explicitly least-privilege:
+  `contents: read`.
+
+---
 ## [0.3.0](https://github.com/dubpixel/dpx_claude_cleaner/compare/v0.2.2...v0.3.0) (2026-07-31)
 
 > Adds a dedicated way to gather sessions you've marked for cleanup, on top
