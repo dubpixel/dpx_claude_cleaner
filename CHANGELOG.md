@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.3] - 2026-08-02
+
+### Fixed
+- `scripts/deploy_local.sh` hardcoded `~/.zshrc` as the alias target,
+  regardless of the invoking user's actual login shell. Now detects zsh vs.
+  bash via `$SHELL` (bash prefers `~/.bashrc`, falls back to
+  `~/.bash_profile`); an unrecognized shell prints the alias line to add
+  manually instead of guessing wrong.
+
+---
+
 ## [0.3.2] - 2026-08-01
 
 ### Fixed
