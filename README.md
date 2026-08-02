@@ -194,7 +194,7 @@ column-flag reference are in `CLAUDE.md`.
 ## Roadmap
 
 - [x] Fix `--help`/`help` mode printing `None` (shipped in 0.2.2)
-- [ ] Add an automated test harness / regression tests
+- [x] Add an automated test harness / regression tests (shipped in 0.4.0)
 - [ ] Make unindexed `msg_count` scanning lazy for large (8+ MB) sessions
 
 See the [open issues](https://github.com/dubpixel/dpx_claude_cleaner/issues) for a full list of proposed features (and known issues).

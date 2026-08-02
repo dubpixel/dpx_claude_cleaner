@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-08-02
+
+### Added
+- Regression test suite under `tests/` (stdlib `unittest`, no new
+  dependencies), organized by behavior area: `test_titles.py`,
+  `test_paths.py`, `test_discovery.py`, `test_operations.py`, `test_cli.py`.
+  Explicit coverage for every regression found and fixed this project so
+  far, including the two most-patched functions
+  (`_clean_synthetic_user_text`'s `<local-command-caveat>`/
+  `<local-command-stdout>` skip logic, and `encode_path`'s real
+  space/`@`/`.` handling) which had no prior test coverage.
+- `.github/workflows/tests.yml`: runs the suite on `push` and
+  `pull_request`, Python 3.10 and 3.12, least-privilege
+  (`contents: read`) token permissions.
+
+---
+
 ## [0.3.3] - 2026-08-02
 
 ### Fixed
