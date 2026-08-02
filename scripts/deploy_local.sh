@@ -9,7 +9,7 @@
 # Purpose: Copy the current src/dpx_claude_Cleaner.py to ~/scr/zazzle,
 #          mark it executable, and wire up a `zazzle` shell alias so
 #          it's runnable from anywhere.
-# Dependencies: bash, zsh (for the alias line)
+# Dependencies: bash; detects zsh or bash to pick an rc file for the alias
 #
 # ================================================================================
 set -euo pipefail
@@ -18,8 +18,27 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$PROJECT_ROOT/src/dpx_claude_Cleaner.py"
 DEST_DIR="$HOME/scr"
 DEST="$DEST_DIR/zazzle"
-RC_FILE="$HOME/.zshrc"
 ALIAS_LINE="alias zazzle=\"$DEST\""
+
+# Pick an rc file based on the user's actual login shell, not the shell
+# this script happens to be run under -- deploy_local.sh is always
+# invoked via `bash scripts/deploy_local.sh` or `./scripts/deploy_local.sh`
+# regardless of whether the user's daily shell is zsh or bash.
+case "$(basename "${SHELL:-}")" in
+    zsh)
+        RC_FILE="$HOME/.zshrc"
+        ;;
+    bash)
+        if [ -f "$HOME/.bashrc" ]; then
+            RC_FILE="$HOME/.bashrc"
+        else
+            RC_FILE="$HOME/.bash_profile"
+        fi
+        ;;
+    *)
+        RC_FILE=""
+        ;;
+esac
 
 if [ ! -f "$SRC" ]; then
     echo "error: $SRC not found" >&2
@@ -57,7 +76,11 @@ PYEOF
 
 echo "deployed dpx_claude_cleaner v$VERSION -> $DEST"
 
-if grep -qF "alias zazzle=" "$RC_FILE" 2>/dev/null; then
+if [ -z "$RC_FILE" ]; then
+    echo "unrecognized shell (\$SHELL=${SHELL:-unset}) -- not adding an alias automatically."
+    echo "add this line to your shell's rc file yourself:"
+    echo "  $ALIAS_LINE"
+elif grep -qF "alias zazzle=" "$RC_FILE" 2>/dev/null; then
     echo "alias zazzle already present in $RC_FILE (left as-is)"
 else
     {
@@ -68,4 +91,8 @@ else
     echo "added alias to $RC_FILE"
 fi
 
-echo "run 'source $RC_FILE' (or open a new shell), then use: zazzle"
+if [ -n "$RC_FILE" ]; then
+    echo "run 'source $RC_FILE' (or open a new shell), then use: zazzle"
+else
+    echo "then open a new shell (or source your rc file), and use: zazzle"
+fi
