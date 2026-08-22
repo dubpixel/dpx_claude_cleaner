@@ -588,7 +588,30 @@ def draw_help(w, width):
     w.noutrefresh()
 
 
-def draw_list(w, sessions, visible, cursor, scroll, height, width):
+def build_display_rows(sessions, visible):
+    """
+    Turn a flat visible-session-index list into a display row list with a
+    project header inserted before each new project group, plus a map from
+    a session's position in `visible` to its row index (for cursor/scroll
+    math). `visible` is assumed already grouped by project (see
+    get_visible()'s grouping step in run_tui) -- this only inserts the
+    header rows, it doesn't do the grouping itself.
+    """
+    rows = []  # ('header', label, count) | ('session', session_idx)
+    row_of_pos = {}
+    last_project = None
+    for pos, idx in enumerate(visible):
+        proj = sessions[idx]["project_path"]
+        if proj != last_project:
+            count = sum(1 for j in visible if sessions[j]["project_path"] == proj)
+            rows.append(("header", proj, count))
+            last_project = proj
+        rows.append(("session", idx))
+        row_of_pos[pos] = len(rows) - 1
+    return rows, row_of_pos
+
+
+def draw_list(w, sessions, visible, rows, row_of_pos, cursor, scroll, height, width):
     w.erase()
     cw_sel = 3
     cw_flag = 4
@@ -605,10 +628,22 @@ def draw_list(w, sessions, visible, cursor, scroll, height, width):
     except curses.error:
         pass
 
+    cur_row = row_of_pos.get(cursor) if cursor < len(visible) else None
     view_rows = height - 1
-    for row, idx in enumerate(visible[scroll: scroll + view_rows], 1):
+    for row, entry in enumerate(rows[scroll: scroll + view_rows], 1):
+        if entry[0] == "header":
+            _, label, count = entry
+            text = f" {label} ({count}) "
+            line = text.center(width, "─")[:width]
+            try:
+                w.addstr(row, 0, line, curses.A_BOLD)
+            except curses.error:
+                pass
+            continue
+
+        _, idx = entry
         s = sessions[idx]
-        is_cur = (visible[cursor] == idx) if cursor < len(visible) else False
+        is_cur = (scroll + row - 1) == cur_row
         sel_mark = "[x]" if s["selected"] else "[ ]"
         flags = ("E" if is_empty(s) else " ") + \
                 ("!" if is_orphan(s) else " ") + \
@@ -749,7 +784,28 @@ def run_tui(stdscr, sessions: list[dict]):
             idxs = [i for i in idxs
                     if lo in sessions[i]["title"].lower()
                     or lo in sessions[i]["project_path"].lower()]
-        return list(idxs)
+        idxs = list(idxs)
+
+        # Group by project so dozens of near-duplicate-looking titles from
+        # the same workspace sit together instead of interleaved by mtime
+        # across all 50+ workspaces. `sessions` is already mtime-desc, so
+        # each group's members stay mtime-desc; groups themselves are
+        # ordered by their most recent session (Python's sort is stable,
+        # and the first member appended to a group is its most recent).
+        groups: dict[str, list[int]] = {}
+        order: list[str] = []
+        for i in idxs:
+            proj = sessions[i]["project_path"]
+            if proj not in groups:
+                groups[proj] = []
+                order.append(proj)
+            groups[proj].append(i)
+        order.sort(key=lambda p: sessions[groups[p][0]]["mtime"], reverse=True)
+
+        flat: list[int] = []
+        for proj in order:
+            flat.extend(groups[proj])
+        return flat
 
     while True:
         height, width = stdscr.getmaxyx()
@@ -767,14 +823,16 @@ def run_tui(stdscr, sessions: list[dict]):
         status_win = stdscr.subwin(status_h, width, height - status_h, 0)
 
         visible = get_visible()
+        rows, row_of_pos = build_display_rows(sessions, visible)
 
         if visible:
             cursor = max(0, min(cursor, len(visible) - 1))
             view_rows = list_h - 1
-            if cursor < scroll:
-                scroll = cursor
-            elif cursor >= scroll + view_rows:
-                scroll = cursor - view_rows + 1
+            cur_row = row_of_pos[cursor]
+            if cur_row < scroll:
+                scroll = cur_row
+            elif cur_row >= scroll + view_rows:
+                scroll = cur_row - view_rows + 1
         else:
             cursor = scroll = 0
 
@@ -783,7 +841,7 @@ def run_tui(stdscr, sessions: list[dict]):
 
         draw_header(header_win, width, len(sessions), len(visible),
                     n_marked, filter_str, orphan_only, help_visible)
-        draw_list(list_win, sessions, visible, cursor, scroll, list_h, width)
+        draw_list(list_win, sessions, visible, rows, row_of_pos, cursor, scroll, list_h, width)
         draw_detail(detail_win, width, cur_s)
         if help_visible:
             draw_help(help_win, width)
