@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-08-21
+
+### Added
+- `vazzle` (`src/dpx_vscode_Cleaner.py`): companion tool that cleans up
+  GitHub Copilot Chat session history in VS Code, mirroring zazzle's
+  browse/rename/delete/export workflow. Fully independent of zazzle --
+  separate script, separate deploy (`scripts/deploy_local_vazzle.sh`),
+  separate tests (`tests/test_vscode_*.py`). Handles both the flat `.json`
+  chat session format and the newer `.jsonl` patch-log format, including
+  the compaction-recovery algorithm documented in
+  `VSCODE-CHAT-RECOVERY.md` (a naive replay silently drops all but the
+  last 1-2 turns of a compacted session). Ships with bulk markdown export
+  in place of AI summarization for v1. See `VAZZLE_PLAN.md`.
+
+---
+
 ## [0.4.0] - 2026-08-02
 
 ### Added
