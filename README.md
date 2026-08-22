@@ -177,15 +177,39 @@ toggle project-only vs. global scope, `s` to sort "delete"-titled sessions
 to the top, `/` to filter, `?` for the full help pane. Full keybindings and
 column-flag reference are in `CLAUDE.md`.
 
+### vazzle — the VS Code companion
+
+Same idea, for GitHub Copilot Chat's session storage in VS Code
+(`workspaceStorage/<hash>/chatSessions/`). Fully independent script,
+independent deploy — see `VAZZLE_PLAN.md` for the design and
+`VSCODE-CHAT-RECOVERY.md` for the on-disk format (including a real
+data-loss trap in VS Code's own patch-log format that this tool works
+around).
+
+```bash
+# Interactive TUI (default)
+python3 src/dpx_vscode_Cleaner.py
+# ...or, after scripts/deploy_local_vazzle.sh: vazzle
+
+# Print stats by workspace and exit
+python3 src/dpx_vscode_Cleaner.py analyze
+```
+
+In the TUI: `j`/`k` to navigate, `SPACE` to mark, `d` to delete (also
+cleans up the matching `chatEditingSessions/` dir), `r` to rename, `x` to
+bulk-export marked/current sessions to markdown, `o` to filter to orphaned
+sessions (workspace folder no longer exists), `/` to filter, `?` for help.
+
 ### Running the tests
 
 ```bash
 python3 -m unittest discover -v
 ```
 
-61 tests, stdlib `unittest` only, no real `~/.claude` data touched — all
-fixtures live in temp directories. Runs automatically on every push and PR
-via `.github/workflows/tests.yml` (Python 3.10 and 3.12).
+107 tests total (zazzle + vazzle), stdlib `unittest` only, no real
+`~/.claude` or VS Code data touched — all fixtures live in temp
+directories. Runs automatically on every push and PR via
+`.github/workflows/tests.yml` (Python 3.10 and 3.12).
 
 <!-- REFLECTION -->
 ## Reflection
@@ -206,6 +230,7 @@ via `.github/workflows/tests.yml` (Python 3.10 and 3.12).
 
 - [x] Fix `--help`/`help` mode printing `None` (shipped in 0.2.2)
 - [x] Add an automated test harness / regression tests (shipped in 0.4.0)
+- [x] Add `vazzle`, a VS Code Copilot Chat companion tool (shipped in 0.5.0)
 - [ ] Make unindexed `msg_count` scanning lazy for large (8+ MB) sessions
 
 See the [open issues](https://github.com/dubpixel/dpx_claude_cleaner/issues) for a full list of proposed features (and known issues).

@@ -6,9 +6,9 @@ This document provides operational directives for AI coding assistants (GitHub C
 
 ## PROJECT: dpx_claude_cleaner
 
-**Status:** v0.4.0 complete (2026-08-02) ✅
+**Status:** v0.5.0 complete (2026-08-21) ✅
 **Branch:** `main`
-**Version File:** `VERSION` (currently 0.4.0 on `main`)
+**Version File:** `VERSION` (currently 0.5.0 on `main`)
 
 ### Architecture (2-minute summary)
 
@@ -26,6 +26,8 @@ move, and delete sessions interactively or via one-shot CLI modes
 | Session manager | Python 3.10+ / `src/dpx_claude_Cleaner.py` | Discovery, title resolution, TUI, CLI modes | See CLAUDE.md for the full `.jsonl`/index schema |
 | Archived versions | `src/archive/cc-sessions-v1.py`, `v2.py` | Earlier iterations, kept for reference | Not maintained |
 | Local deploy | `scripts/deploy_local.sh` | Copies to `~/scr/zazzle`, wires a shell alias | Bakes the resolved version in at copy time |
+| vazzle (VS Code companion) | `src/dpx_vscode_Cleaner.py` | Same shape, cleans up GitHub Copilot Chat sessions | Fully independent of zazzle -- see CLAUDE.md's vazzle section, `VAZZLE_PLAN.md` |
+| vazzle deploy | `scripts/deploy_local_vazzle.sh` | Copies to `~/scr/vazzle`, wires a shell alias | Independent copy of `deploy_local.sh`'s logic, not shared |
 | Tests | `tests/` (stdlib `unittest`) | Regression coverage, organized by behavior area | Run: `python3 -m unittest discover -v`; see CLAUDE.md's Testing section |
 | CI | `.github/workflows/tests.yml` | Runs the suite on push/PR, Python 3.10 + 3.12 | `contents: read` only |
 | Project context | `CLAUDE.md` | **Source of truth** for the on-disk schema, TUI keys, extension points | Read this before touching session discovery/title logic |
