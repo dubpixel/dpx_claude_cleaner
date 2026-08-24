@@ -6,7 +6,7 @@ This document provides operational directives for AI coding assistants (GitHub C
 
 ## PROJECT: dpx_claude_cleaner
 
-**Status:** v0.5.0 complete (2026-08-21) ✅
+**Status:** v0.5.0 complete (2026-08-23) ✅
 **Branch:** `main`
 **Version File:** `VERSION` (currently 0.5.0 on `main`)
 

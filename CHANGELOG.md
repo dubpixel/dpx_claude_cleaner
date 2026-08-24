@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.5.0] - 2026-08-21
+## [0.5.0] - 2026-08-23
 
 ### Added
 - `vazzle` (`src/dpx_vscode_Cleaner.py`): companion tool that cleans up
@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `VSCODE-CHAT-RECOVERY.md` (a naive replay silently drops all but the
   last 1-2 turns of a compacted session). Ships with bulk markdown export
   in place of AI summarization for v1. See `VAZZLE_PLAN.md`.
+- vazzle TUI readability: real-data testing against 500+ sessions across
+  50+ workspaces showed the flat, mtime-sorted list was unreadable.
+  Sessions are now grouped by project with a header row per workspace
+  (most recently active project first, turn count descending within each
+  group instead of pure recency). Empty (0-turn) sessions -- a normal VS
+  Code artifact, one file per opened chat tab even if nothing was said --
+  are hidden by default (`e` to show them), and titles never fall back to
+  a raw `session_id` hash.
 
 ---
 

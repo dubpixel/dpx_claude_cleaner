@@ -342,6 +342,23 @@ detail and the fix (snapshot into a `requestId`-keyed archive before every
 such replace) is in `VSCODE-CHAT-RECOVERY.md` -- read that before touching
 `reconstruct_jsonl_session()` in `dpx_vscode_Cleaner.py`.
 
+The TUI groups sessions by project (header row per workspace, most
+recently active first, via `build_display_rows()`), hides empty (0-turn)
+sessions by default (`e` to show them -- these are a normal VS Code
+artifact, one file per opened chat tab even if nothing was said, not
+useful data), and never falls back to a raw `session_id` as a title
+(`session_title()` falls back to `(empty chat)` or `(untitled, N turns)`
+instead). All three came from live-testing against 500+ real sessions
+across 50+ workspaces -- the flat, ungrouped, unfiltered list was
+unreadable.
+
+Tests: `tests/test_vscode_reconstruction.py` (the compaction-recovery
+algorithm -- non-negotiable, this is the whole reason the tool exists),
+`test_vscode_paths.py` (`workspace.json` resolution), `test_vscode_discovery.py`
+(`collect_all_sessions()`, title fallbacks), `test_vscode_operations.py`
+(rename/delete/export), `test_vscode_tui.py` (`build_display_rows()`
+grouping). Same synthetic-fixtures-only policy as zazzle's tests.
+
 macOS-only for now (the `Application Support` path is macOS-specific).
 Full design, v1 scope, and open questions (`state.vscdb` contents, the
 "most complete response" heuristic, whether `chatEditingSessions` is

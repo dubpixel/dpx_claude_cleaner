@@ -195,10 +195,13 @@ python3 src/dpx_vscode_Cleaner.py
 python3 src/dpx_vscode_Cleaner.py analyze
 ```
 
-In the TUI: `j`/`k` to navigate, `SPACE` to mark, `d` to delete (also
-cleans up the matching `chatEditingSessions/` dir), `r` to rename, `x` to
-bulk-export marked/current sessions to markdown, `o` to filter to orphaned
-sessions (workspace folder no longer exists), `/` to filter, `?` for help.
+In the TUI: sessions are grouped by project (most recently active first),
+with empty (0-turn) sessions hidden by default since they're a normal but
+noisy VS Code artifact. `j`/`k` to navigate, `SPACE` to mark, `d` to
+delete (also cleans up the matching `chatEditingSessions/` dir), `r` to
+rename, `x` to bulk-export marked/current sessions to markdown, `o` to
+filter to orphaned sessions (workspace folder no longer exists), `e` to
+show empty sessions, `/` to filter, `?` for help.
 
 ### Running the tests
 
@@ -206,7 +209,7 @@ sessions (workspace folder no longer exists), `/` to filter, `?` for help.
 python3 -m unittest discover -v
 ```
 
-107 tests total (zazzle + vazzle), stdlib `unittest` only, no real
+113 tests total (zazzle + vazzle), stdlib `unittest` only, no real
 `~/.claude` or VS Code data touched — all fixtures live in temp
 directories. Runs automatically on every push and PR via
 `.github/workflows/tests.yml` (Python 3.10 and 3.12).
