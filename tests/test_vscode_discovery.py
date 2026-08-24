@@ -98,14 +98,28 @@ class CollectAllSessionsTests(unittest.TestCase):
         self.assertFalse(s["title_from_index"])
         self.assertEqual(s["turn_count"], 1)
 
-    def test_title_falls_back_to_session_id_when_nothing_else_available(self):
+    def test_title_never_falls_back_to_a_raw_session_id(self):
+        # A bare hash reads as noise in a list -- fall back to a
+        # human-readable placeholder instead. The id is still available
+        # via session_id / the TUI detail line.
         real_project = Path(self.tmp.name) / "p3"
         real_project.mkdir()
         ws_dir = make_workspace(self.storage_root, "hash5", real_project)
         write_flat_session(ws_dir, "sess-5", customTitle=None, requests=[])
 
         sessions = vc.collect_all_sessions(self.vscode_root)
-        self.assertEqual(sessions[0]["title"], "sess-5")
+        self.assertEqual(sessions[0]["title"], "(empty chat)")
+
+    def test_title_falls_back_to_a_turn_count_placeholder_when_turns_exist_but_no_text(self):
+        real_project = Path(self.tmp.name) / "p3b"
+        real_project.mkdir()
+        ws_dir = make_workspace(self.storage_root, "hash5b", real_project)
+        write_flat_session(ws_dir, "sess-5b", customTitle=None, requests=[
+            {"requestId": "r1", "message": {"text": ""}, "response": [], "timestamp": 1},
+        ])
+
+        sessions = vc.collect_all_sessions(self.vscode_root)
+        self.assertEqual(sessions[0]["title"], "(untitled, 1 turn)")
 
     def test_jsonl_sessions_are_discovered_and_marked_with_that_format(self):
         real_project = Path(self.tmp.name) / "p4"

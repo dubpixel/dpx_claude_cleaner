@@ -256,7 +256,16 @@ def _extract_response_text(response) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def session_title(state: dict, fallback: str) -> tuple[str, bool]:
+def session_title(state: dict) -> tuple[str, bool]:
+    """
+    Returns (title, is_authoritative). Never falls back to a raw session_id
+    -- a bare hash reads as noise in a list, and the id is still shown in
+    the detail line for whoever needs it. Falls back to a turn-count
+    placeholder instead, so a genuinely-empty tab (normal, see
+    VSCODE-CHAT-RECOVERY.md's caveats) reads differently from a session
+    that has turns but no extractable user text (e.g. an inline/agent
+    invocation with no typed message).
+    """
     ct = (state.get("customTitle") or "").strip()
     if ct:
         return ct, True
@@ -268,7 +277,10 @@ def session_title(state: dict, fallback: str) -> tuple[str, bool]:
         if text:
             snippet = text.replace("\n", " ")
             return snippet[:120] + ("..." if len(snippet) > 120 else ""), False
-    return fallback, False
+    if requests:
+        n = len(requests)
+        return f"(untitled, {n} turn{'s' if n != 1 else ''})", False
+    return "(empty chat)", False
 
 
 def render_markdown(state: dict, title: str) -> str:
@@ -336,7 +348,7 @@ def collect_all_sessions(vscode_root: Path) -> list[dict]:
             except (OSError, PermissionError):
                 state = {}
 
-            title, title_authoritative = session_title(state, fallback=session_id)
+            title, title_authoritative = session_title(state)
             requests = state.get("requests") or []
             turn_count = len(requests)
 
@@ -548,7 +560,7 @@ def fmt_ct(n) -> str:
 # TUI widgets
 # ---------------------------------------------------------------------------
 
-def draw_header(w, width, total, shown, marked, filter_str, orphan_only, help_vis):
+def draw_header(w, width, total, shown, marked, filter_str, orphan_only, show_empty, help_vis):
     w.erase()
     title = f" vazzle v{__version__} "
     w.addstr(0, 0, title, curses.A_BOLD | curses.A_REVERSE)
@@ -557,6 +569,8 @@ def draw_header(w, width, total, shown, marked, filter_str, orphan_only, help_vi
         info += f"  [{marked} marked]"
     if orphan_only:
         info += "  [orphans]"
+    if show_empty:
+        info += "  [+empty]"
     if filter_str:
         info += f"  /{filter_str}"
     try:
@@ -574,9 +588,10 @@ def draw_help(w, width):
         "  j/k ↑↓     navigate              r    rename current",
         "  SPACE       mark/unmark (advance) x    export marked/current to markdown",
         "  a / A       mark all / unmark all d    delete marked or current",
-        "  o           orphan sessions only",
+        "  o           orphan sessions only    e    show empty sessions (hidden by default)",
         "  /           text filter",
         "  q           quit                  ?    close help",
+        "  Within a project: sorted by turn count, most substantial first.",
         "  FLAGS:  E=empty  !=orphan (workspace gone)  J=.jsonl format",
     ]
     w.addstr(0, 0, " KEYS ".center(width, "─"), curses.A_DIM)
@@ -688,7 +703,7 @@ def draw_detail(w, width, s):
 
 def draw_status(w, width, msg=""):
     w.erase()
-    default = " SPC=mark  d=del  r=rename  x=export  /=filter  o=orphan  q=quit"
+    default = " SPC=mark  d=del  r=rename  x=export  /=filter  o=orphan  e=show-empty  q=quit"
     try:
         w.addstr(0, 0, (msg or default)[:width], curses.A_REVERSE)
     except curses.error:
@@ -768,6 +783,9 @@ def run_tui(stdscr, sessions: list[dict]):
 
     filter_str = ""
     orphan_only = False
+    show_empty = False  # empty (0-turn) sessions are normal-but-noisy -- see
+                         # VSCODE-CHAT-RECOVERY.md's caveats; hidden by
+                         # default, 'e' brings them back
     cursor = 0
     scroll = 0
     status_msg = ""
@@ -779,6 +797,8 @@ def run_tui(stdscr, sessions: list[dict]):
             idxs = [i for i in idxs if is_orphan(sessions[i])]
         else:
             idxs = list(idxs)
+        if not show_empty:
+            idxs = [i for i in idxs if not is_empty(sessions[i])]
         if filter_str:
             lo = filter_str.lower()
             idxs = [i for i in idxs
@@ -788,30 +808,36 @@ def run_tui(stdscr, sessions: list[dict]):
 
         # Group by project so dozens of near-duplicate-looking titles from
         # the same workspace sit together instead of interleaved by mtime
-        # across all 50+ workspaces. `sessions` is already mtime-desc, so
-        # each group's members stay mtime-desc; groups themselves are
-        # ordered by their most recent session (Python's sort is stable,
-        # and the first member appended to a group is its most recent).
+        # across all 50+ workspaces. Groups are ordered by their most
+        # recently active session; within a group, sessions with more
+        # turns sort first -- a handful of substantial chats surface above
+        # a pile of one-off/near-empty ones instead of pure recency
+        # deciding the order.
         groups: dict[str, list[int]] = {}
-        order: list[str] = []
         for i in idxs:
-            proj = sessions[i]["project_path"]
-            if proj not in groups:
-                groups[proj] = []
-                order.append(proj)
-            groups[proj].append(i)
-        order.sort(key=lambda p: sessions[groups[p][0]]["mtime"], reverse=True)
+            groups.setdefault(sessions[i]["project_path"], []).append(i)
+
+        order = sorted(
+            groups.keys(),
+            key=lambda p: max(sessions[i]["mtime"] for i in groups[p]),
+            reverse=True,
+        )
 
         flat: list[int] = []
         for proj in order:
-            flat.extend(groups[proj])
+            members = sorted(
+                groups[proj],
+                key=lambda i: (sessions[i]["turn_count"], sessions[i]["mtime"]),
+                reverse=True,
+            )
+            flat.extend(members)
         return flat
 
     while True:
         height, width = stdscr.getmaxyx()
         header_h = 1
         detail_h = 1
-        help_h = 8 if help_visible else 0
+        help_h = 9 if help_visible else 0
         status_h = 1
         list_h = max(3, height - header_h - detail_h - help_h - status_h)
 
@@ -840,7 +866,7 @@ def run_tui(stdscr, sessions: list[dict]):
         cur_s = sessions[visible[cursor]] if visible and cursor < len(visible) else None
 
         draw_header(header_win, width, len(sessions), len(visible),
-                    n_marked, filter_str, orphan_only, help_visible)
+                    n_marked, filter_str, orphan_only, show_empty, help_visible)
         draw_list(list_win, sessions, visible, rows, row_of_pos, cursor, scroll, list_h, width)
         draw_detail(detail_win, width, cur_s)
         if help_visible:
@@ -890,6 +916,10 @@ def run_tui(stdscr, sessions: list[dict]):
 
         elif ch == ord("o"):
             orphan_only = not orphan_only
+            cursor = scroll = 0
+
+        elif ch == ord("e"):
+            show_empty = not show_empty
             cursor = scroll = 0
 
         elif ch == ord("/"):
