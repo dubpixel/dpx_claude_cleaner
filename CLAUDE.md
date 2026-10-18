@@ -316,3 +316,50 @@ existed as a throwaway script, not a committed test. Runs automatically via
   no rollback if a move partially fails across multiple sessions.
 - `fix-orphans` is non-interactive in the sense that it prompts at the
   project-batch level, not per-session. Could be made per-session.
+
+---
+
+## vazzle (VS Code Copilot Chat companion)
+
+`src/dpx_vscode_Cleaner.py` is a separate tool, same repo, same shape
+(browse/rename/delete TUI + CLI modes), for cleaning up GitHub Copilot
+Chat session history in VS Code. **Fully independent of everything above**
+-- separate script, separate deploy (`scripts/deploy_local_vazzle.sh`),
+separate tests (`tests/test_vscode_*.py`), zero shared code or imports
+with `dpx_claude_Cleaner.py` by design (see `VAZZLE_PLAN.md`'s hard
+constraint). Deploys to the `vazzle` alias.
+
+Reads `~/Library/Application Support/Code/User/workspaceStorage/<hash>/`:
+`workspace.json` for the real project path (exact `file://` URI, no lossy
+decode needed, unlike `decode_encoded()` above), `chatSessions/*.json`
+(flat) or `*.jsonl` (event-sourced patch log) for the chat itself, and
+`chatEditingSessions/<uuid>/` for associated file-edit history.
+
+The `.jsonl` format has a real data-loss trap: Copilot Chat periodically
+*compacts*, replacing the entire live `requests` array and silently
+dropping earlier turns if you naively replay-and-read-final-state. Full
+detail and the fix (snapshot into a `requestId`-keyed archive before every
+such replace) is in `VSCODE-CHAT-RECOVERY.md` -- read that before touching
+`reconstruct_jsonl_session()` in `dpx_vscode_Cleaner.py`.
+
+The TUI groups sessions by project (header row per workspace, most
+recently active first, via `build_display_rows()`), hides empty (0-turn)
+sessions by default (`e` to show them -- these are a normal VS Code
+artifact, one file per opened chat tab even if nothing was said, not
+useful data), and never falls back to a raw `session_id` as a title
+(`session_title()` falls back to `(empty chat)` or `(untitled, N turns)`
+instead). All three came from live-testing against 500+ real sessions
+across 50+ workspaces -- the flat, ungrouped, unfiltered list was
+unreadable.
+
+Tests: `tests/test_vscode_reconstruction.py` (the compaction-recovery
+algorithm -- non-negotiable, this is the whole reason the tool exists),
+`test_vscode_paths.py` (`workspace.json` resolution), `test_vscode_discovery.py`
+(`collect_all_sessions()`, title fallbacks), `test_vscode_operations.py`
+(rename/delete/export), `test_vscode_tui.py` (`build_display_rows()`
+grouping). Same synthetic-fixtures-only policy as zazzle's tests.
+
+macOS-only for now (the `Application Support` path is macOS-specific).
+Full design, v1 scope, and open questions (`state.vscdb` contents, the
+"most complete response" heuristic, whether `chatEditingSessions` is
+always 1:1 with a chat session) are in `VAZZLE_PLAN.md`.
