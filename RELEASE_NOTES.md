@@ -4,6 +4,30 @@ Filled in from `dpx_release_note_template.md` for MAJOR/MINOR releases only
 (patch releases are tracked in `CHANGELOG.md`).
 
 ---
+## [0.6.0](https://github.com/dubpixel/dpx_claude_cleaner/compare/v0.5.0...v0.6.0) (2026-10-18)
+
+> Move a Claude Code session between machines (macOS, Windows, Linux) with
+> one command on each end, without hand-copying files into encoded folders.
+
+### Upgrade Steps
+* None. Re-run `scripts/deploy_local.sh` if you use the `zazzle` alias.
+
+### Breaking Changes
+* None.
+
+### New Features
+* `zazzle export` bundles a session (transcript, sidecar dir, manifest,
+  HANDOFF.md) into a versioned zip; `zazzle import <bundle> --project <path>`
+  unpacks it for `claude --resume <id>`. Copy-only: transcripts are never
+  edited, and a session ID is never duplicated across projects.
+* `zazzle duplicates` lists session IDs that exist in more than one project
+  (these break `claude --resume <id>`).
+* Code does not travel in the bundle: commit and push first (export warns).
+
+### Bug Fixes
+* None.
+
+---
 ## [0.4.0](https://github.com/dubpixel/dpx_claude_cleaner/compare/v0.3.3...v0.4.0) (2026-08-02)
 
 > Adds a deterministic regression suite and CI automation so session-logic

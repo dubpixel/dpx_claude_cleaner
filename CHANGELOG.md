@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-10-18
+
+### Added
+- Cross-machine session transfer (macOS <-> Windows <-> Linux) in zazzle:
+  - `export` zips one session (selected by `--id`, `--name`, `--latest`, or
+    an interactive pick) into `claude-session-<id>-<yyyymmdd-hhmm>-v1.zip`
+    with a `manifest.json` (source OS/host, project path, git state, sha256),
+    a generated `HANDOFF.md`, the transcript, and its `<session-id>/` sidecar
+    dir (subagents, tool-results). `--include-memory` also carries the
+    project's auto-memory. Warns on a recently-written transcript and on
+    uncommitted/unpushed git state.
+  - `import` verifies the manifest and sha256, files the session under the
+    target project's encoded dir (`--project`, default cwd), and prints the
+    `claude --resume <id>` next steps. Copy-only and binary-safe; refuses to
+    create a second copy of a session ID (`--on-conflict ask|overwrite|abort`).
+  - `duplicates` lists session IDs present in more than one project, which
+    make `claude --resume <id>` fail.
+- `tests/test_transfer.py`: 21 tests (round-trip, CRLF-safe bytes, sidecar,
+  duplicate-ID same/different hash, tamper and zip-slip rejection, path
+  encoding for Mac/Windows/Linux, `CLAUDE_CODE_PROJECT_DIR_NAME`).
+- Verified on a real install: the `<session-id>/` sidecar dir exists
+  (`subagents/`, `tool-results/`, `workflows/`, `custom-title.json`).
+
+### Known gaps
+- `--rewrite-paths` (experimental transcript path rewriting) is not
+  implemented; transcripts are never modified. The HANDOFF first prompt
+  covers the path change instead.
+- Project folder names past 200 chars are not computed (Claude Code's hash
+  is undocumented); import reuses a folder Claude already made, else asks
+  you to run `claude` once in the target dir.
+- Not yet verified on a real Windows machine.
+- `move`/`delete` ignore sidecar dirs (#23, pre-existing).
+
 ## [0.5.0] - 2026-08-23
 
 ### Added

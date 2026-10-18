@@ -149,7 +149,32 @@ starts scoped to the current project too, but is a live toggle instead
 | `tui` | Interactive TUI (default) |
 | `analyze` | Print stats by project and exit |
 | `fix-orphans` | Interactive CLI to clean orphan index entries and add unindexed sessions |
+| `export` | Zip one session (+ sidecar dir) for another machine: `--id`/`--name`/`--latest`, `--out`, `--include-memory` |
+| `import` | `import BUNDLE [--project PATH] [--on-conflict ask\|overwrite\|abort]`: verify sha256, file under the target's encoded project dir |
+| `duplicates` | List session IDs present in more than one project dir |
 | `help` | Print docstring and exit |
+
+---
+
+## Cross-machine transfer (export / import)
+
+Bundle = zip with `manifest.json` (`bundle_format` 1, sha256, source OS/path,
+git state), `HANDOFF.md`, `<id>.jsonl`, the `<id>/` sidecar dir if present
+(verified on a real install: `subagents/`, `tool-results/`, `workflows/`,
+`custom-title.json`), and `memory/` only with `--include-memory`.
+
+Rules (all enforced by `tests/test_transfer.py`):
+
+- **Copy-only, binary.** Transcripts are never edited or re-encoded; the
+  manifest sha256 must match on import. No `--rewrite-paths`.
+- **One copy per session ID.** `claude --resume <id>` fails if two projects
+  hold the same ID, so import overwrites an existing differing copy in place
+  (after `--on-conflict` approval) instead of adding a second one.
+- **Folder name = `encode_path(cwd)`**, or `CLAUDE_CODE_PROJECT_DIR_NAME`.
+  Past 200 chars Claude adds an undocumented hash; we reuse a folder Claude
+  already made for that cwd, else refuse. Resume-by-ID doesn't need the name.
+- Zip members are filtered (`_safe_member`) so a hostile bundle can't write
+  outside the project dir.
 
 ---
 
@@ -266,7 +291,7 @@ python3 -m unittest discover -v
 | `test_discovery.py` | `collect_all_sessions()`, `is_empty()`, `is_orphan()` |
 | `test_operations.py` | `rename_session()`, `delete_sessions()` |
 | `test_cli.py` | `main()`'s `--scope current` filtering |
-
+| `test_transfer.py` | `export_session()`, `import_bundle()`, `find_duplicate_sessions()`, `project_dir_name_for()`, `pick_session()` |
 All fixtures are synthetic, built in temp directories via `tests/helpers.py`
 -- tests never touch real `~/.claude` data (that's for manual verification
 only, see Development Philosophy below). `tests.helpers` loads

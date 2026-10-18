@@ -21,11 +21,22 @@ MODES (first positional arg, default: tui)
   tui         Interactive TUI: list, filter, delete, rename, rehome
   analyze     Print a summary report and exit
   fix-orphans Non-interactive: re-home sessions whose project dir is gone
+  export      Zip one session (+ sidecar dir) for another machine
+  import      Unpack an export bundle into the right project dir
+  duplicates  List session IDs present in more than one project dir
   help        Print this help
 
 USAGE
   python3 src/dpx_claude_Cleaner.py [mode] [--root ~/.claude]
   zazzle [mode] [--root ~/.claude]     (after scripts/deploy_local.sh)
+
+TRANSFER (macOS <-> Windows <-> Linux, copy-only, never edits transcripts)
+  export  [--id ID | --name TEXT | --latest] [--out DIR] [--include-memory]
+  import  BUNDLE [--project PATH] [--include-memory] [--on-conflict ask|overwrite|abort]
+  then on the target:  cd <project> && claude --resume <session-id>
+  Code does not travel in the bundle: commit and push first. Launch flags
+  like --mcp-config and --add-dir are not restored on resume.
+  Remote Control is an alternative if the source machine stays on.
 
 ENVIRONMENT
   CLAUDE_ROOT   Override path to the .claude directory
@@ -52,11 +63,15 @@ COLUMN FLAGS
 from __future__ import annotations
 
 import curses
+import hashlib
 import json
 import os
 import re
 import shutil
+import socket
+import subprocess
 import sys
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -702,6 +717,419 @@ def cmd_fix_orphans(sessions: list[dict], claude_root: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cross-machine session transfer (export / import / duplicates)
+#
+# Copy-only by design: a session is zipped on the source machine and unzipped
+# into the right project dir on the target. Neither the source transcript nor
+# the target's other files are ever modified, and the transcript bytes are
+# never re-encoded (LF/CRLF safe), so the sha256 in the manifest always holds.
+# ---------------------------------------------------------------------------
+
+BUNDLE_FORMAT = 1
+MAX_PROJECT_DIR_NAME = 200   # Claude Code truncates + hashes names past this
+RECENT_SESSION_SECS = 120    # newer than this -> transcript may still be changing
+
+# Launch-time state Claude Code does NOT restore on resume (per its docs).
+NOT_RESTORED_FLAGS = ("--mcp-config", "--settings", "--plugin-dir",
+                      "--fallback-model", "--add-dir (and /add-dir)")
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fs(p: Path) -> Path:
+    """On Windows, prefix long paths with \\\\?\\ so copies past 260 chars work."""
+    if os.name == "nt" and len(str(p)) > 240 and not str(p).startswith("\\\\?\\"):
+        return Path("\\\\?\\" + str(p.resolve()))
+    return p
+
+
+def _run(cmd: list[str], cwd: str | None = None) -> str | None:
+    """Run a command, return stripped stdout, or None on any failure."""
+    try:
+        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def claude_version() -> str | None:
+    return _run(["claude", "--version"])
+
+
+def git_state(project_path: str | None) -> dict:
+    """Git facts about the session's project dir (code does not travel in the bundle)."""
+    state = {"is_repo": False, "remote_url": None, "branch": None,
+             "head_commit": None, "dirty": None, "unpushed_commits": None}
+    if not project_path or not Path(project_path).is_dir():
+        return state
+    if _run(["git", "rev-parse", "--is-inside-work-tree"], project_path) != "true":
+        return state
+    state["is_repo"] = True
+    state["remote_url"] = _run(["git", "remote", "get-url", "origin"], project_path)
+    state["branch"] = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], project_path)
+    state["head_commit"] = _run(["git", "rev-parse", "HEAD"], project_path)
+    status = _run(["git", "status", "--porcelain"], project_path)
+    state["dirty"] = bool(status) if status is not None else None
+    ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], project_path)
+    state["unpushed_commits"] = int(ahead) if ahead and ahead.isdigit() else None
+    return state
+
+
+def build_handoff(manifest: dict, target_project: str | None = None) -> str:
+    """HANDOFF.md text. target_project is None at export, filled in at import."""
+    src = manifest.get("source_project_path") or "(unknown)"
+    dst = target_project or "<NEW PROJECT PATH>"
+    src_os = manifest.get("source_os", "?")
+    git = manifest.get("git") or {}
+    lines = [
+        "# Session handoff", "",
+        f"- Session: {manifest.get('session_name') or manifest['session_id']}",
+        f"- Session ID: {manifest['session_id']}",
+        f"- Moved from: {src_os} ({manifest.get('source_hostname', '?')})",
+        f"- Source project path: {src}",
+        f"- Target project path: {dst}", "",
+        "## Code does not travel with the transcript", "",
+    ]
+    if git.get("is_repo"):
+        lines.append(f"Source branch `{git.get('branch')}` at `{git.get('head_commit')}`"
+                     f" (remote: {git.get('remote_url') or 'none'}).")
+        if git.get("dirty") or (git.get("unpushed_commits") or 0) > 0:
+            lines.append("WARNING: the source had uncommitted changes or unpushed "
+                         "commits when exported. Commit and push them, then pull "
+                         "on the target, or the resumed session will not match the files.")
+    else:
+        lines.append("The source project was not a git repo. Copy the code across yourself.")
+    lines += ["", "## First prompt for the resumed session", "", "Paste this:", "",
+              f"> This session was moved from {src_os} to a different machine. The "
+              f"project previously at `{src}` is now at `{dst}`. Use paths and "
+              "shell commands that fit this machine from here on. Re-read files "
+              "before editing them; do not trust paths or file contents from "
+              "earlier in this conversation.", "",
+              "## Not restored on resume", "",
+              "Re-pass these launch flags if you used them: "
+              + ", ".join(f"`{f}`" for f in NOT_RESTORED_FLAGS) + ".", "",
+              "Sessions still age out on the target per `cleanupPeriodDays` "
+              "(default 30 days) in settings.json.", "",
+              "Alternative: if the source machine stays on, Remote Control can "
+              "drive the running session from another device without any transfer.", ""]
+    return "\n".join(lines)
+
+
+def pick_session(sessions: list[dict], *, session_id: str | None = None,
+                 name: str | None = None, latest: bool = False,
+                 current_project: str | None = None) -> tuple[dict | None, str | None]:
+    """Resolve an export selector to one session. Returns (session, error)."""
+    live = [s for s in sessions if s["file_exists"] and s["path"]]
+    if session_id:
+        hits = [s for s in live if s["session_id"] == session_id] or \
+               [s for s in live if s["session_id"].startswith(session_id)]
+    elif name:
+        hits = [s for s in live if name.lower() in s["title"].lower()]
+    elif latest:
+        pool = [s for s in live if s["project_dir"].name == current_project] or live
+        hits = pool[:1]  # collect_all_sessions() is already newest-first
+    else:
+        return None, "no selector given"
+    if not hits:
+        return None, "no matching session"
+    if len(hits) > 1:
+        return None, ("ambiguous, matches: " +
+                      "; ".join(f"{s['session_id'][:8]} {s['title'][:40]}" for s in hits[:5]))
+    return hits[0], None
+
+
+def export_session(s: dict, out_dir: Path, include_memory: bool = False,
+                   now: datetime | None = None) -> tuple[Path | None, list[str], str | None]:
+    """
+    Zip one session into out_dir. Returns (bundle_path, warnings, error).
+    Never touches the source files.
+    """
+    warnings: list[str] = []
+    jsonl = s["path"]
+    if jsonl is None or not jsonl.exists() or jsonl.stat().st_size == 0:
+        return None, warnings, "session file is missing or empty"
+
+    now = now or datetime.now(timezone.utc)
+    if now.timestamp() - jsonl.stat().st_mtime < RECENT_SESSION_SECS:
+        warnings.append("transcript was modified in the last two minutes; the "
+                        "session may still be running and the bundle may be incomplete")
+
+    sid = s["session_id"]
+    cwd = get_project_cwd_from_jsonl(jsonl)
+    git = git_state(cwd)
+    if git["dirty"] or (git["unpushed_commits"] or 0) > 0:
+        warnings.append("git: uncommitted changes or unpushed commits. Code does "
+                        "not travel with the transcript; commit and push first")
+
+    manifest = {
+        "bundle_format": BUNDLE_FORMAT,
+        "session_id": sid,
+        "session_name": s["title"] if s["title_from_index"] else None,
+        "source_os": sys.platform,
+        "source_hostname": socket.gethostname(),
+        "source_project_path": cwd,
+        "source_project_dir_name": s["project_dir"].name,
+        "claude_code_version": claude_version(),
+        "exported_at": now.isoformat(),
+        "transcript_sha256": sha256_file(jsonl),
+        "git": git,
+    }
+
+    bundle = out_dir / f"claude-session-{sid[:8]}-{now.strftime('%Y%m%d-%H%M')}-v{BUNDLE_FORMAT}.zip"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(bundle, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+            zf.writestr("HANDOFF.md", build_handoff(manifest))
+            zf.write(_fs(jsonl), f"{sid}.jsonl")
+            # Optional sidecar (subagents/, tool-results/, ...) next to the .jsonl
+            sidecar = s["project_dir"] / sid
+            if sidecar.is_dir():
+                for f in sorted(sidecar.rglob("*")):
+                    if f.is_file():
+                        zf.write(_fs(f), f"{sid}/{f.relative_to(sidecar).as_posix()}")
+            if include_memory and (s["project_dir"] / "memory").is_dir():
+                mem = s["project_dir"] / "memory"
+                for f in sorted(mem.rglob("*")):
+                    if f.is_file():
+                        zf.write(_fs(f), f"memory/{f.relative_to(mem).as_posix()}")
+    except OSError as ex:
+        return None, warnings, str(ex)
+    return bundle, warnings, None
+
+
+def find_session_copies(claude_root: Path, session_id: str) -> list[Path]:
+    """Every projects/*/<session_id>.jsonl on this machine."""
+    projects = claude_root / "projects"
+    if not projects.is_dir():
+        return []
+    return sorted(p for p in projects.glob(f"*/{session_id}.jsonl") if p.is_file())
+
+
+def find_duplicate_sessions(claude_root: Path) -> dict[str, list[Path]]:
+    """Session IDs present in more than one project dir (these break --resume <id>)."""
+    seen: dict[str, list[Path]] = {}
+    projects = claude_root / "projects"
+    if projects.is_dir():
+        for p in sorted(projects.glob("*/*.jsonl")):
+            if p.name.startswith("agent-"):
+                continue
+            seen.setdefault(p.stem, []).append(p)
+    return {sid: ps for sid, ps in seen.items() if len(ps) > 1}
+
+
+def project_dir_name_for(target: Path, claude_root: Path) -> str | None:
+    """
+    Folder name Claude Code uses under projects/ for a working dir, or None if
+    it can't be computed safely. Past 200 chars Claude appends an undocumented
+    hash, which we deliberately don't reimplement: instead reuse a folder
+    Claude already made for that cwd.
+    """
+    override = os.environ.get("CLAUDE_CODE_PROJECT_DIR_NAME")
+    if override:
+        return override
+    name = encode_path(target)
+    if len(name) <= MAX_PROJECT_DIR_NAME:
+        return name
+    projects = claude_root / "projects"
+    for pd in sorted(projects.iterdir()) if projects.is_dir() else []:
+        for j in pd.glob("*.jsonl"):
+            if get_project_cwd_from_jsonl(j) == str(target):
+                return pd.name
+    return None
+
+
+def _safe_member(name: str, prefix: str) -> bool:
+    """Zip-slip guard: only accept relative, non-escaping members under prefix."""
+    parts = Path(name).parts
+    return (name.startswith(prefix) and not name.startswith("/")
+            and ".." not in parts and ":" not in parts[0])
+
+
+def import_bundle(bundle: Path, claude_root: Path, target_project: Path,
+                  include_memory: bool = False, on_conflict=None) -> dict:
+    """
+    Unpack a bundle into the right project dir. on_conflict(existing_path) must
+    return "overwrite" or "abort" when a different copy of the same session ID
+    already exists; the default aborts. Returns a result dict with keys:
+    status (imported|already-imported|aborted|error), message, path, warnings, manifest.
+    """
+    res = {"status": "error", "message": "", "path": None, "warnings": [], "manifest": None}
+    try:
+        zf = zipfile.ZipFile(bundle)
+    except (OSError, zipfile.BadZipFile) as ex:
+        res["message"] = f"cannot open bundle: {ex}"
+        return res
+
+    with zf:
+        try:
+            manifest = json.loads(zf.read("manifest.json"))
+        except (KeyError, json.JSONDecodeError):
+            res["message"] = "bundle has no valid manifest.json"
+            return res
+        res["manifest"] = manifest
+        if manifest.get("bundle_format") != BUNDLE_FORMAT:
+            res["message"] = f"unsupported bundle_format {manifest.get('bundle_format')!r}"
+            return res
+        sid = manifest["session_id"]
+        try:
+            data = zf.read(f"{sid}.jsonl")
+        except KeyError:
+            res["message"] = f"bundle is missing {sid}.jsonl"
+            return res
+        if hashlib.sha256(data).hexdigest() != manifest.get("transcript_sha256"):
+            res["message"] = "transcript sha256 does not match the manifest (corrupt bundle?)"
+            return res
+
+        mine, theirs = claude_version(), manifest.get("claude_code_version")
+        if mine and theirs and mine != theirs:
+            res["warnings"].append(f"Claude Code version differs (bundle {theirs}, "
+                                   f"here {mine}); the transcript format may not be compatible")
+
+        # Duplicate check across ALL projects: two copies of one ID break --resume <id>.
+        copies = find_session_copies(claude_root, sid)
+        new_hash = manifest["transcript_sha256"]
+        if copies and all(sha256_file(c) == new_hash for c in copies):
+            res.update(status="already-imported", path=copies[0],
+                       message=f"already present at {copies[0]}; nothing copied")
+            return res
+        dest_dir: Path | None = None
+        if copies:
+            if len(copies) > 1:
+                res["message"] = ("session ID already exists in several projects "
+                                  "with different content; run the 'duplicates' mode first")
+                return res
+            choice = (on_conflict or (lambda p: "abort"))(copies[0])
+            if choice != "overwrite":
+                res.update(status="aborted", message="kept the existing copy; nothing changed")
+                return res
+            dest_dir = copies[0].parent   # overwrite in place, never a second copy
+
+        if dest_dir is None:
+            name = project_dir_name_for(target_project, claude_root)
+            if name is None:
+                res["message"] = ("project path is too long to name safely; run `claude` "
+                                  "once in the target directory, then import again")
+                return res
+            dest_dir = claude_root / "projects" / name
+
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{sid}.jsonl"
+        tmp = dest_dir / f".{sid}.jsonl.importing"
+        try:
+            with open(_fs(tmp), "wb") as f:      # binary: never CRLF-convert
+                f.write(data)
+            os.replace(_fs(tmp), _fs(dest))      # atomic rename into place
+            groups = [(f"{sid}/", dest_dir)]
+            if include_memory and not (dest_dir / "memory").exists():
+                groups.append(("memory/", dest_dir))
+            elif include_memory:
+                res["warnings"].append("target already has a memory/ dir; left untouched")
+            for prefix, base in groups:
+                for m in zf.namelist():
+                    if m.endswith("/") or not _safe_member(m, prefix):
+                        continue
+                    out = base / m
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    with open(_fs(out), "wb") as f:
+                        f.write(zf.read(m))
+        except OSError as ex:
+            res["message"] = str(ex)
+            return res
+
+    res.update(status="imported", path=dest, message=f"imported to {dest}")
+    return res
+
+
+def _ask_conflict(existing: Path) -> str:
+    """Interactive conflict prompt; non-interactive shells always abort."""
+    if not sys.stdin.isatty():
+        return "abort"
+    print(f"  A different copy of this session already exists:\n    {existing}")
+    ans = input("  [o]verwrite it / [a]bort (default): ").strip().lower()
+    return "overwrite" if ans.startswith("o") else "abort"
+
+
+def cmd_export(sessions: list[dict], args) -> int:
+    current = encode_path(Path.cwd())
+    if not (args.id or args.name or args.latest):
+        # Interactive pick from the current project (or everything if none match).
+        pool = [s for s in sessions if s["file_exists"] and s["project_dir"].name == current] \
+            or [s for s in sessions if s["file_exists"]]
+        pool = pool[:15]
+        if not pool or not sys.stdin.isatty():
+            print("export: give --id, --name or --latest", file=sys.stderr)
+            return 2
+        for i, s in enumerate(pool, 1):
+            print(f"  {i:2}. {s['session_id'][:8]}  {fmt_dt(s['mtime'])}  {s['title'][:60]}")
+        pick = input("Export which? [number]: ").strip()
+        if not pick.isdigit() or not 1 <= int(pick) <= len(pool):
+            print("cancelled")
+            return 1
+        s, err = pool[int(pick) - 1], None
+    else:
+        s, err = pick_session(sessions, session_id=args.id, name=args.name,
+                              latest=args.latest, current_project=current)
+    if err:
+        print(f"export: {err}", file=sys.stderr)
+        return 1
+    out_dir = Path(args.out).expanduser() if args.out else Path.cwd()
+    bundle, warnings, err = export_session(s, out_dir, args.include_memory)
+    for w in warnings:
+        print(f"WARNING: {w}", file=sys.stderr)
+    if err:
+        print(f"export: {err}", file=sys.stderr)
+        return 1
+    print(f"Exported: {bundle}")
+    print("Copy it to the other machine (scp, USB, cloud drive), then run: "
+          "zazzle import <bundle> --project <path>")
+    return 0
+
+
+def cmd_import(args, claude_root: Path) -> int:
+    if not args.bundle:
+        print("import: give the bundle path", file=sys.stderr)
+        return 2
+    target = Path(args.project).expanduser().resolve() if args.project else Path.cwd()
+    resolver = {"overwrite": lambda p: "overwrite", "abort": lambda p: "abort",
+                "ask": _ask_conflict}[args.on_conflict]
+    res = import_bundle(Path(args.bundle).expanduser(), claude_root, target,
+                        args.include_memory, resolver)
+    for w in res["warnings"]:
+        print(f"WARNING: {w}", file=sys.stderr)
+    print(f"{res['status']}: {res['message']}")
+    if res["status"] not in ("imported", "already-imported"):
+        return 1
+    sid = res["manifest"]["session_id"]
+    print(f"\nNext steps:\n  cd \"{target}\"\n  claude --resume {sid}")
+    print(f"If resume-by-ID fails:\n  claude --resume \"{res['path']}\"\n")
+    print(build_handoff(res["manifest"], str(target)))
+    return 0
+
+
+def cmd_duplicates(claude_root: Path) -> int:
+    dupes = find_duplicate_sessions(claude_root)
+    if not dupes:
+        print("No session IDs exist in more than one project.")
+        return 0
+    print("These session IDs exist in several projects; "
+          "`claude --resume <id>` will fail for them:")
+    for sid, paths in dupes.items():
+        print(f"\n  {sid}")
+        for p in paths:
+            print(f"    {sha256_file(p)[:12]}  {p}")
+    print("\nDelete the copies you don't want (zazzle's TUI 'd' key). "
+          "Matching hashes mean identical content.")
+    return 1
+
+
+# ---------------------------------------------------------------------------
 # TUI formatting helpers
 # ---------------------------------------------------------------------------
 
@@ -1300,7 +1728,8 @@ def main():
         epilog=__doc__,
     )
     parser.add_argument("mode", nargs="?", default="tui",
-                        choices=["tui", "analyze", "fix-orphans", "help"],
+                        choices=["tui", "analyze", "fix-orphans", "export", "import",
+                                 "duplicates", "help"],
                         help="Operation mode (default: tui)")
     parser.add_argument("--root", default=None,
                         help="Path to .claude directory (default: ~/.claude)")
@@ -1308,6 +1737,19 @@ def main():
                         help="current: only the project matching this shell's "
                              "cwd, like /resume (default). all: every project. "
                              "In tui mode, 'g' toggles this live instead.")
+    parser.add_argument("bundle", nargs="?", default=None,
+                        help="(import) path to the export bundle .zip")
+    sel = parser.add_argument_group("export / import")
+    sel.add_argument("--id", help="(export) session ID or unique prefix")
+    sel.add_argument("--name", help="(export) text in the session title")
+    sel.add_argument("--latest", action="store_true",
+                     help="(export) most recent session in this project")
+    sel.add_argument("--out", help="(export) output dir (default: cwd)")
+    sel.add_argument("--project", help="(import) project path on this machine (default: cwd)")
+    sel.add_argument("--include-memory", action="store_true",
+                     help="also carry the project's auto-memory/ dir")
+    sel.add_argument("--on-conflict", choices=["ask", "overwrite", "abort"], default="ask",
+                     help="(import) a different copy of this session ID already exists")
     parser.add_argument("--version", action="version",
                         version=f"%(prog)s {__version__}")
     args = parser.parse_args()
@@ -1323,9 +1765,18 @@ def main():
         print(f"Claude root not found: {claude_root}", file=sys.stderr)
         sys.exit(1)
 
+    # Modes that don't need the full session scan.
+    if args.mode == "import":
+        sys.exit(cmd_import(args, claude_root))
+    if args.mode == "duplicates":
+        sys.exit(cmd_duplicates(claude_root))
+
     print(f"dpx_claude_cleaner v{__version__}")
     print(f"Scanning {claude_root} ...")
     sessions = collect_all_sessions(claude_root)
+
+    if args.mode == "export":
+        sys.exit(cmd_export(sessions, args))
 
     if not sessions:
         print("No sessions found.")
